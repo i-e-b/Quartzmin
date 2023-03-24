@@ -10,7 +10,7 @@ namespace Quartzmin;
 
 public class TypeHandlerService
 {
-    private readonly Dictionary<Type, TypeHandlerDescriptor> _handlers = new Dictionary<Type, TypeHandlerDescriptor>();
+    private readonly Dictionary<Type, TypeHandlerDescriptor> _handlers = new();
 
     private readonly Services _services;
 

@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Globalization;
@@ -73,7 +74,7 @@ public class ExpressionParser
             else if (expressionPartsTemp.Length == 6)
             {
                 //If last element ends with 4 digits, a year element has been supplied and no seconds element
-                Regex yearRegex = new Regex("\\d{4}$");
+                var yearRegex = new Regex("\\d{4}$");
                 if (yearRegex.IsMatch(expressionPartsTemp[5]))
                 {
                     Array.Copy(expressionPartsTemp, 0, parsed, 1, 6);
@@ -164,19 +165,19 @@ public class ExpressionParser
         }
 
         // Convert SUN-SAT format to 0-6 format
-        for (int i = 0; i <= 6; i++)
+        for (var i = 0; i <= 6; i++)
         {
-            DayOfWeek currentDay = (DayOfWeek)i;
-            string currentDayOfWeekDescription = currentDay.ToString().Substring(0, 3).ToUpperInvariant();
+            var currentDay = (DayOfWeek)i;
+            var currentDayOfWeekDescription = currentDay.ToString().Substring(0, 3).ToUpperInvariant();
             expressionParts[5] = Regex.Replace(expressionParts[5], currentDayOfWeekDescription, i.ToString(), RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
         }
 
         // Convert JAN-DEC format to 1-12 format
-        for (int i = 1; i <= 12; i++)
+        for (var i = 1; i <= 12; i++)
         {
-            DateTime currentMonth = new DateTime(DateTime.Now.Year, i, 1);
-            string currentMonthDescription = currentMonth.ToString("MMM", m_en_culture).ToUpperInvariant();
+            var currentMonth = new DateTime(DateTime.Now.Year, i, 1);
+            var currentMonthDescription = currentMonth.ToString("MMM", m_en_culture).ToUpperInvariant();
             expressionParts[4] = Regex.Replace(expressionParts[4], currentMonthDescription, i.ToString(), RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         }
 
@@ -187,7 +188,7 @@ public class ExpressionParser
         }
 
         // Loop through all parts and apply global normalization
-        for (int i = 0; i < expressionParts.Length; i++)
+        for (var i = 0; i < expressionParts.Length; i++)
         {
             // convert all '*/1' to '*'
             if (expressionParts[i] == "*/1")
@@ -226,8 +227,8 @@ public class ExpressionParser
 
     private static string DecreaseDaysOfWeek(string dayOfWeekExpressionPart)
     {
-        char[] dowChars = dayOfWeekExpressionPart.ToCharArray();
-        for (int i = 0; i < dowChars.Length; i++)
+        var dowChars = dayOfWeekExpressionPart.ToCharArray();
+        for (var i = 0; i < dowChars.Length; i++)
         {
             int charNumeric;
             if ((i == 0 || dowChars[i - 1] != '#' && dowChars[i - 1] != '/')

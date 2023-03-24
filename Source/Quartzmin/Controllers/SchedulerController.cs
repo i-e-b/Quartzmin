@@ -1,4 +1,5 @@
-﻿using Quartz;
+﻿#nullable enable
+using Quartz;
 using Quartzmin.Helpers;
 using Quartzmin.Models;
 using Quartz.Plugins.RecentHistory;
@@ -36,7 +37,7 @@ public class SchedulerController : PageControllerBase
         } catch (NotImplementedException) { }
 
         int? failedJobs = null;
-        int executedJobs = metadata.NumberOfJobsExecuted;
+        var executedJobs = metadata.NumberOfJobsExecuted;
             
         if (histStore != null)
         {

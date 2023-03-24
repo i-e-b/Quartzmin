@@ -1,7 +1,7 @@
-﻿using Quartz;
+﻿#nullable enable
+using Quartz;
 using Quartz.Impl.Calendar;
 using Quartzmin.Helpers;
-using Quartzmin.TypeHandlers;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -12,75 +12,71 @@ namespace Quartzmin.Models;
 
 public class CalendarViewModel : IHasValidation
 {
-    public string Name { get; set; }
+    public string Name { get; set; } = "Untitled";
 
     [Required]
-    public string Type { get; set; }
+    public string Type { get; set; } = "Invalid";
 
+    // ReSharper disable once UnusedAutoPropertyAccessor.Global
     public bool IsRoot { get; set; }
 
-    public string CustomType { get; set; }
+    public string? Description { get; set; }
 
-    public string Description { get; set; }
+    public string TimeZone { get; set; } = "UTC";
 
-    public string TimeZone { get; set; }
+    public string? CronExpression { get; set; }
 
-    public string CronExpression { get; set; }
-
+    // ReSharper disable once UnusedAutoPropertyAccessor.Global
     public bool InvertTimeRange { get; set; }
 
-    public string StartingTime { get; set; }
+    public string StartingTime { get; set; }="";
 
-    public string EndingTime { get; set; }
+    public string EndingTime { get; set; }="";
 
-    public List<string> Days { get; set; }
+    public List<string> Days { get; set; } = new ();
 
-    public List<string> Dates { get; set; }
+    public List<string> Dates { get; set; } = new ();
 
-    public bool[] DaysExcluded { get; set; }
+    public bool[] DaysExcluded { get; set; } = Array.Empty<bool>();
 
     public void Validate(ICollection<ValidationError> errors)
     {
         ModelValidator.ValidateObject(this, errors, camelCase: false);
 
-        if (knownCalendars.TryGetValue(Type, out var o))
-            o.Validator(this, errors);
-        else
-            errors.Add(new ValidationError { Field = nameof(Type), Reason = "Invalid value." });
+        if (_knownCalendars.TryGetValue(Type, out var o)) o!.Validator(this, errors);
+        else errors.Add(new ValidationError { Field = nameof(Type), Reason = "Invalid value." });
     }
 
-    public static CalendarViewModel FromCalendar(ICalendar calendar)
+    public static CalendarViewModel? FromCalendar(ICalendar calendar)
     {
-        if (converters.TryGetValue(calendar.GetType(), out var modelFactory))
-            return modelFactory(calendar);
+        if (_converters.TryGetValue(calendar.GetType(), out var modelFactory)) return modelFactory?.Invoke(calendar);
 
-        if (calendar is BaseCalendar)
-            return converters[typeof(BaseCalendar)](calendar);
+        if (calendar is BaseCalendar) return _converters[typeof(BaseCalendar)]?.Invoke(calendar);
 
-        return converters[typeof(ICalendar)](calendar);
+        return _converters[typeof(ICalendar)]?.Invoke(calendar);
     }
 
     private class CalendarHandler
     {
-        public Action<CalendarViewModel, ICollection<ValidationError>> Validator { get; set; }
-        public Func<CalendarViewModel, ICalendar> Builder { get; set; }
+        public Action<CalendarViewModel, ICollection<ValidationError>> Validator { get; set; } = ValidatorThrowIfNotSet;
+        public Func<CalendarViewModel, ICalendar> Builder { get; set; } = BuilderThrowIfNotSet;
+
+        private static ICalendar BuilderThrowIfNotSet(CalendarViewModel a1)=> throw new Exception($"Internal error: Builder was not set in {nameof(CalendarHandler)}");
+        private static void ValidatorThrowIfNotSet(CalendarViewModel a1, ICollection<ValidationError> a2)=> throw new Exception($"Internal error: Validator was not set in {nameof(CalendarHandler)}");
     }
 
     private TimeZoneInfo ResolveTimeZone()
     {
-        if (string.IsNullOrEmpty(TimeZone))
-            return null;
-        return TimeZoneInfo.FindSystemTimeZoneById(TimeZone);
+        return string.IsNullOrEmpty(TimeZone) ? TimeZoneInfo.Utc : (TimeZoneInfo.FindSystemTimeZoneById(TimeZone) ?? TimeZoneInfo.Utc);
     }
 
     public ICalendar BuildCalendar()
     {
-        if (knownCalendars.TryGetValue(Type, out var o))
-            return o.Builder(this);
+        if (_knownCalendars.TryGetValue(Type, out var o)) return o!.Builder(this)!;
         throw new InvalidOperationException("Unsupported Type: " + Type);
     }
 
-    private static readonly Dictionary<string, CalendarHandler> knownCalendars = new Dictionary<string, CalendarHandler>
+    private static readonly Dictionary<string, CalendarHandler> _knownCalendars = new()
     {
         ["annual"] = new CalendarHandler
         {
@@ -93,26 +89,23 @@ public class CalendarViewModel : IHasValidation
             },
             Validator = (model, errors) =>
             {
-                for (int i = 0; i < model.Days.Count; i++)
+                for (var i = 0; i < model.Days.Count; i++)
                 {
-                    if (DateTime.TryParseExact(model.Days[i], "MMMM d", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime _) == false)
+                    if (DateTime.TryParseExact(model.Days[i] ?? "", "MMMM d", CultureInfo.InvariantCulture, DateTimeStyles.None, out var _) == false)
                         errors.Add(new ValidationError { Field = nameof(model.Days), Reason = "Invalid format.", FieldIndex = i });
                 }
             }
         },
         ["cron"] = new CalendarHandler
         {
-            Builder = model =>
-            {
-                return new CronCalendar(model.CronExpression) { TimeZone = model.ResolveTimeZone(), Description = model.Description };
-            },
+            Builder = model => new CronCalendar(model.CronExpression??"") { TimeZone = model.ResolveTimeZone(), Description = model.Description },
             Validator = (model, errors) =>
             {
-                if (string.IsNullOrEmpty(model.CronExpression))
+                if (string.IsNullOrEmpty(model.CronExpression!))
                     errors.Add(ValidationError.EmptyField(nameof(model.CronExpression)));
                 else
                 {
-                    if (Quartz.CronExpression.IsValidExpression(model.CronExpression) == false)
+                    if (Quartz.CronExpression.IsValidExpression(model.CronExpression!) == false)
                         errors.Add(new ValidationError { Field = nameof(model.CronExpression), Reason = "Invalid format." });
                 }
 
@@ -120,14 +113,11 @@ public class CalendarViewModel : IHasValidation
         },
         ["daily"] = new CalendarHandler
         {
-            Builder = model =>
+            Builder = model => new DailyCalendar(model.StartingTime, model.EndingTime)
             {
-                return new DailyCalendar(model.StartingTime, model.EndingTime)
-                {
-                    TimeZone = model.ResolveTimeZone(),
-                    InvertTimeRange = model.InvertTimeRange,
-                    Description = model.Description
-                };
+                TimeZone = model.ResolveTimeZone(),
+                InvertTimeRange = model.InvertTimeRange,
+                Description = model.Description
             },
             Validator = (model, errors) =>
             {
@@ -159,9 +149,9 @@ public class CalendarViewModel : IHasValidation
             },
             Validator = (model, errors) =>
             {
-                for (int i = 0; i < model.Dates.Count; i++)
+                for (var i = 0; i < model.Dates.Count; i++)
                 {
-                    if (DateTime.TryParseExact(model.Dates[i], DateTimeSettings.DefaultDateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime _) == false)
+                    if (DateTime.TryParseExact(model.Dates[i]??"", DateTimeSettings.DefaultDateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var _) == false)
                         errors.Add(new ValidationError { Field = nameof(model.Dates), Reason = "Invalid format.", FieldIndex = i });
                 }
             }
@@ -171,7 +161,7 @@ public class CalendarViewModel : IHasValidation
             Builder = model =>
             {
                 var cal = new MonthlyCalendar { TimeZone = model.ResolveTimeZone(), Description = model.Description };
-                for (int i = 0; i < model.DaysExcluded.Length; i++)
+                for (var i = 0; i < model.DaysExcluded.Length; i++)
                     cal.SetDayExcluded(i + 1, model.DaysExcluded[i]);
                 return cal;
             },
@@ -186,7 +176,7 @@ public class CalendarViewModel : IHasValidation
             Builder = model =>
             {
                 var cal = new WeeklyCalendar { TimeZone = model.ResolveTimeZone(), Description = model.Description };
-                for (int i = 0; i < model.DaysExcluded.Length; i++)
+                for (var i = 0; i < model.DaysExcluded.Length; i++)
                     cal.SetDayExcluded((DayOfWeek)i, model.DaysExcluded[i]);
                 return cal;
             },
@@ -198,18 +188,18 @@ public class CalendarViewModel : IHasValidation
         },
         ["none"] = new CalendarHandler
         {
-            Builder = model => null,
-            Validator = (model, errors) => { }
+            Builder = _ => throw new InvalidOperationException(),
+            Validator = (_, _) => { }
         },
         ["custom"] = new CalendarHandler
         {
-            Builder = model => throw new InvalidOperationException(),
-            Validator = (model, errors) => { }
+            Builder = _ => throw new InvalidOperationException(),
+            Validator = (_, _) => { }
         }
 
     };
 
-    private static readonly Dictionary<Type, Func<ICalendar, CalendarViewModel>> converters = new Dictionary<Type, Func<ICalendar, CalendarViewModel>>
+    private static readonly Dictionary<Type, Func<ICalendar, CalendarViewModel>> _converters = new()
     {
         [typeof(AnnualCalendar)] = calendar =>
         {
@@ -217,7 +207,7 @@ public class CalendarViewModel : IHasValidation
             return new CalendarViewModel
             {
                 Type = "annual",
-                Description = cal.Description,
+                Description = cal.Description ?? "Annual",
                 TimeZone = cal.TimeZone.Id,
                 Days = cal.DaysExcluded.Select(x => x.ToString("MMMM d", CultureInfo.InvariantCulture)).ToList(),
             };
@@ -228,7 +218,7 @@ public class CalendarViewModel : IHasValidation
             return new CalendarViewModel
             {
                 Type = "cron",
-                Description = cal.Description,
+                Description = cal.Description ?? "Cron schedule",
                 TimeZone = cal.TimeZone.Id,
                 CronExpression = cal.CronExpression.CronExpressionString
             };
@@ -239,7 +229,7 @@ public class CalendarViewModel : IHasValidation
             return new CalendarViewModel
             {
                 Type = "daily",
-                Description = cal.Description,
+                Description = cal.Description ?? "Daily",
                 TimeZone = cal.TimeZone.Id,
                 StartingTime = cal.RangeStartingTime,
                 EndingTime = cal.RangeEndingTime,
@@ -251,7 +241,7 @@ public class CalendarViewModel : IHasValidation
             return new CalendarViewModel
             {
                 Type = "holiday",
-                Description = cal.Description,
+                Description = cal.Description ?? "Holiday based",
                 TimeZone = cal.TimeZone.Id,
                 Dates = cal.ExcludedDates.Select(x => x.ToString(DateTimeSettings.DefaultDateFormat, CultureInfo.InvariantCulture)).ToList()
             };
@@ -262,7 +252,7 @@ public class CalendarViewModel : IHasValidation
             return new CalendarViewModel
             {
                 Type = "monthly",
-                Description = cal.Description,
+                Description = cal.Description ?? "Monthly",
                 TimeZone = cal.TimeZone.Id,
                 DaysExcluded = cal.DaysExcluded
             };
@@ -273,7 +263,7 @@ public class CalendarViewModel : IHasValidation
             return new CalendarViewModel
             {
                 Type = "weekly",
-                Description = cal.Description,
+                Description = cal.Description ?? "Weekly",
                 TimeZone = cal.TimeZone.Id,
                 DaysExcluded = cal.DaysExcluded
             };
@@ -284,7 +274,7 @@ public class CalendarViewModel : IHasValidation
             return new CalendarViewModel
             {
                 Type = "custom",
-                Description = cal.Description,
+                Description = cal.Description ?? "Custom",
                 TimeZone = cal.TimeZone.Id,
             };
         },
@@ -294,7 +284,7 @@ public class CalendarViewModel : IHasValidation
             return new CalendarViewModel
             {
                 Type = "custom",
-                Description = cal.Description,
+                Description = cal.Description ?? "Custom"
             };
         }
     };

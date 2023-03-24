@@ -1,4 +1,5 @@
-﻿using Quartz;
+﻿#nullable enable
+using Quartz;
 using Quartzmin.Helpers;
 using Quartzmin.Models;
 using System;
@@ -18,9 +19,11 @@ public class CalendarsController : PageControllerBase
 
         var list = new List<CalendarListItem>();
 
-        foreach (string name in calendarNames)
+        foreach (var name in calendarNames)
         {
+            if (string.IsNullOrEmpty(name)) continue;
             var cal = await Scheduler.GetCalendar(name);
+            if (cal is null) continue;
             list.Add(new CalendarListItem { Name = name, Description = cal.Description, Type = cal.GetType() });
         }
             
@@ -43,13 +46,14 @@ public class CalendarsController : PageControllerBase
     public async Task<IActionResult> Edit(string name)
     {
         var calendar = await Scheduler.GetCalendar(name);
+        if (calendar is null) return BadRequest()!;
 
-        var model = calendar.Flatten().Select(x => CalendarViewModel.FromCalendar(x)).ToArray();
+        var model = calendar.Flatten().Select(CalendarViewModel.FromCalendar).ToArray();
 
-        if (model.Any())
+        if (model.Length > 0 && model[0] is not null)
         {
-            model[0].IsRoot = true;
-            model[0].Name = name;
+            model[0]!.IsRoot = true;
+            model[0]!.Name = name;
         }
 
         ViewBag.IsNew = false;
@@ -57,10 +61,9 @@ public class CalendarsController : PageControllerBase
         return View(model);
     }
 
-    private void RemoveLastEmpty(List<string> list)
+    private static void RemoveLastEmpty(IList<string>? list)
     {
-        if (list?.Count > 0 && string.IsNullOrEmpty(list.Last()))
-            list.RemoveAt(list.Count - 1);
+        if (list?.Count > 0 && string.IsNullOrEmpty(list.Last())) list.RemoveAt(list.Count - 1);
     }
 
     [HttpPost, JsonErrorResponse]
@@ -71,7 +74,7 @@ public class CalendarsController : PageControllerBase
         if (chain.Length == 0 || string.IsNullOrEmpty(chain[0].Name))
             result.Errors.Add(ValidationError.EmptyField(nameof(CalendarViewModel.Name)));
 
-        for (int i = 0; i < chain.Length; i++)
+        for (var i = 0; i < chain.Length; i++)
         {
             RemoveLastEmpty(chain[i].Days);
             RemoveLastEmpty(chain[i].Dates);
@@ -81,41 +84,36 @@ public class CalendarsController : PageControllerBase
             errors.ForEach(x => x.SegmentIndex = i);
             result.Errors.AddRange(errors);
         }
-            
-        if (result.Success)
+
+        if (!result.Success) return Json(result);
+        var name = chain[0].Name;
+
+        ICalendar? existing = null;
+
+        if (isNew == false)
+            existing = await Scheduler.GetCalendar(name);
+
+        ICalendar? root = null, current = null;
+        for (var i = 0; i < chain.Length; i++)
         {
-            string name = chain[0].Name;
+            var newCal = chain[i].Type.Equals("custom") ? existing : chain[i].BuildCalendar();
 
-            ICalendar existing = null;
+            if (newCal is null) break;
 
-            if (isNew == false)
-                existing = await Scheduler.GetCalendar(name);
+            if (i == 0) root = newCal;
+            else if (current is not null) current.CalendarBase = newCal;
 
-            ICalendar root = null, current = null;
-            for (int i = 0; i < chain.Length; i++)
-            {
-                ICalendar newCal = chain[i].Type.Equals("custom") ? existing : chain[i].BuildCalendar();
+            current = newCal;
+            existing = existing?.CalendarBase;
+        }
 
-                if (newCal == null)
-                    break;
-
-                if (i == 0)
-                    root = newCal;
-                else
-                    current.CalendarBase = newCal;
-
-                current = newCal;
-                existing = existing?.CalendarBase;
-            }
-                
-            if (root == null)
-            {
-                result.Errors.Add(new ValidationError { Field = nameof(CalendarViewModel.Type), Reason = "Cannot create calendar.", SegmentIndex = 0 });
-            }
-            else
-            {
-                await Scheduler.AddCalendar(name, root, replace: true, updateTriggers: true);
-            }
+        if (root == null)
+        {
+            result.Errors.Add(new ValidationError { Field = nameof(CalendarViewModel.Type), Reason = "Cannot create calendar.", SegmentIndex = 0 });
+        }
+        else
+        {
+            await Scheduler.AddCalendar(name, root, replace: true, updateTriggers: true);
         }
 
         return Json(result);
@@ -123,17 +121,19 @@ public class CalendarsController : PageControllerBase
 
     public class DeleteArgs
     {
-        public string Name { get; set; }
+        // ReSharper disable once UnusedAutoPropertyAccessor.Global
+        public string? Name { get; set; }
     }
 
 
     [HttpPost, JsonErrorResponse]
     public async Task<IActionResult> Delete([FromBody] DeleteArgs args)
     {
-        if (!await Scheduler.DeleteCalendar(args.Name))
-            throw new InvalidOperationException("Cannot delete calendar " + args.Name);
+        var name = args.Name;
+        if (name is null) throw new InvalidOperationException("Cannot delete calendar, argument invalid");
+        if (!await Scheduler.DeleteCalendar(name)) throw new InvalidOperationException("Cannot delete calendar " + args.Name);
 
-        return NoContent();
+        return NoContent()!;
     }
 
 }

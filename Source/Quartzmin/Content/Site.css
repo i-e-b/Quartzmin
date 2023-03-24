@@ -25,7 +25,7 @@
 .ui.menu.top,
 .ui.menu.top .item:first-child,
 .ui.menu.top .item:last-child {
-    border-radius: 0px !important;
+    border-radius: 0 !important;
 }
 
 .ui.menu .ui.header.item {
@@ -37,7 +37,7 @@
 }
 
 .ui.table {
-    border-radius: 0px !important;
+    border-radius: 0 !important;
 }
 
 .ui.table td {
@@ -65,11 +65,11 @@
 }
 
 #job-data-map.ui.table > thead > tr > th {
-    border-bottom: 0px !important;
+    border-bottom: 0 !important;
 }
 
 #job-data-map.ui.table > tbody > tr > td {
-    border-top: 0px !important;
+    border-top: 0 !important;
 }
 
 .template {
@@ -86,12 +86,12 @@ input:-ms-input-placeholder {
 
 .calendar .ui.table thead th {
     background: #f9fafb;
-    padding: 7px 0px !important;
+    padding: 7px 0 !important;
 }
 
 .changing-type {
     display: none;
-    bottom: 0px; width: 6px
+    bottom: 0; width: 6px
 }
 
 .ui.table td.accept-error.error {
@@ -111,7 +111,7 @@ input:-ms-input-placeholder {
     background-color: #107c10;
     display: block;
     position: absolute;
-    bottom: 0px;
+    bottom: 0;
     width: 5px;
 }
 
@@ -185,7 +185,7 @@ table.highlight-rows > tbody > tr:hover > td, table.highlight-rows > tbody > tr.
 
 .ui.vertical.menu .item > i.icon.left {
     float: none;
-    margin: 0em 0.6em 0em 0em;
+    margin: 0 0.6em 0 0;
 }
 
 .context-menu > .ui.menu {
@@ -306,7 +306,7 @@ tr.job-key a > span.group {
 }
 
 .ui.segments > .segment:not(:last-child):after {
-    font-family: Icons;
+    font-family: Icons, emoji;
     font-style: normal;
     font-weight: 400;
     font-size: 1.5em;
@@ -369,7 +369,7 @@ tr.job-key a > span.group {
 }
 
 #scheduler-dashboard .ui.dividing.header {
-    margin-bottom: 0px;
+    margin-bottom: 0;
 }
 
 #scheduler-dashboard .ui.table {
@@ -383,15 +383,15 @@ tr.job-key a > span.group {
 }
 
 #scheduler-dashboard > .ui.grid {
-    margin: 0px;
+    margin: 0;
 }
 
 #scheduler-dashboard > .ui.grid > .column {
-    padding: 14px 0px 0px !important;
+    padding: 14px 0 0 !important;
 }
 
 #scheduler-dashboard #msg-panel:not(:empty) {
-    margin-top: 0px;
+    margin-top: 0;
     margin-bottom: 15px;
 }
 
@@ -410,19 +410,19 @@ tr.job-key a > span.group {
 
 
 #scheduler-dashboard .group-actions ul {
-    margin: 5px 0px;
+    margin: 5px 0;
     list-style:none;
     padding-left: 16px;
 }
 
 #scheduler-dashboard .group-actions li {
     clear: both;
-    margin: 0px;
-    padding: 0px;
+    margin: 0;
+    padding: 0;
 }
 
 #scheduler-dashboard .group-actions li .ui.button {
-    margin: 0px 4px;
+    margin: 0 4px;
     float: right;
 }
 
@@ -430,7 +430,7 @@ tr.job-key a > span.group {
 #scheduler-dashboard .group-actions li.resumed:before {
     position: absolute;
     font-size: 11px;
-    font-family: Icons;
+    font-family: Icons, emoji;
     font-style: normal;
     margin-left: -1.2em;
     margin-top: 0.1em;
@@ -467,7 +467,7 @@ input[type=text].stats {
 }
 
 #history-list tr.error-row > td {
-    padding-top: 0px;
+    padding-top: 0;
     border-top: none;
 }
 
@@ -480,7 +480,7 @@ input[type=text].stats {
 }
 
 #history-list tr.error-row > td p:before {
-    font-family: Icons;
+    font-family: Icons, emoji;
     margin-left: -15px;
     content: "\f101";
     position: absolute;

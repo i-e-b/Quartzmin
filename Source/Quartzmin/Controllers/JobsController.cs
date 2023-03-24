@@ -1,4 +1,5 @@
-﻿using Quartz;
+﻿#nullable enable
+using Quartz;
 using Quartz.Impl.Matchers;
 using Quartzmin.Helpers;
 using Quartzmin.Models;

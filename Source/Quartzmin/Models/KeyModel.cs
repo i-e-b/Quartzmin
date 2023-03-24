@@ -8,7 +8,7 @@ public class KeyModel
 
     public string Group { get; set; }
 
-    public JobKey ToJobKey() => new JobKey(Name, Group);
+    public JobKey ToJobKey() => new(Name, Group);
 
-    public TriggerKey ToTriggerKey() => new TriggerKey(Name, Group);
+    public TriggerKey ToTriggerKey() => new(Name, Group);
 }

@@ -6,7 +6,7 @@ namespace Quartzmin.Helpers;
 
 public class JsonErrorResponseAttribute : ActionFilterAttribute
 {
-    private static readonly JsonSerializerSettings _serializerSettings = new JsonSerializerSettings();
+    private static readonly JsonSerializerSettings _serializerSettings = new();
 
     public override void OnActionExecuted(ActionExecutedContext context)
     {

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿#nullable enable
+using System.Collections.Generic;
 using System.Linq;
 
 namespace Quartzmin.Models;
@@ -7,13 +8,13 @@ public class ValidationResult
 {
     public bool Success => !Errors.Any();
 
-    public List<ValidationError> Errors { get; set; } = new List<ValidationError>();
+    public List<ValidationError> Errors { get; } = new();
 }
 
 public class ValidationError
 {
-    public string Field { get; set; }
-    public string Reason { get; set; }
+    public string? Field { get; set; }
+    public string? Reason { get; set; }
     public int? SegmentIndex { get; set; }
     public int? FieldIndex { get; set; }
 

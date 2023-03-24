@@ -1,4 +1,5 @@
-﻿using Quartz;
+﻿#nullable enable
+using Quartz;
 using Quartzmin.Models;
 using Quartzmin.TypeHandlers;
 using System;
@@ -53,7 +54,7 @@ internal static class Extensions
 
     public static string ETag(this DateTime dateTime)
     {
-        long etagHash = dateTime.ToFileTimeUtc();
+        var etagHash = dateTime.ToFileTimeUtc();
         return '\"' + Convert.ToString(etagHash, 16) + '\"';
     }
 
@@ -114,16 +115,16 @@ internal static class Extensions
     {
         // https://github.com/JamesNK/Newtonsoft.Json/blob/master/Src/Newtonsoft.Json/Utilities/ReflectionUtils.cs
 
-        string fullyQualifiedTypeName = type.AssemblyQualifiedName;
+        var fullyQualifiedTypeName = type.AssemblyQualifiedName;
 
-        StringBuilder builder = new StringBuilder();
+        var builder = new StringBuilder();
 
         // loop through the type name and filter out qualified assembly details from nested type names
-        bool writingAssemblyName = false;
-        bool skippingAssemblyDetails = false;
-        for (int i = 0; i < fullyQualifiedTypeName.Length; i++)
+        var writingAssemblyName = false;
+        var skippingAssemblyDetails = false;
+        for (var i = 0; i < fullyQualifiedTypeName.Length; i++)
         {
-            char current = fullyQualifiedTypeName[i];
+            var current = fullyQualifiedTypeName[i];
             switch (current)
             {
                 case '[':
@@ -212,7 +213,7 @@ internal static class Extensions
 
                 if (model.SelectedType == null) // if there is no suitable TypeHandler, create dynamic one
                 {
-                    Type t = model.Value.GetType();
+                    var t = model.Value.GetType();
 
                     string strValue;
                     var m = t.GetMethod(nameof(ToString), BindingFlags.Instance | BindingFlags.Public, null, CallingConventions.Any, new Type[0], null);
@@ -320,7 +321,7 @@ internal static class Extensions
 
     public static string GetScheduleDescription(this IDailyTimeIntervalTrigger trigger)
     {
-        string result = GetScheduleDescription(trigger.RepeatInterval, trigger.RepeatIntervalUnit, trigger.RepeatCount);
+        var result = GetScheduleDescription(trigger.RepeatInterval, trigger.RepeatIntervalUnit, trigger.RepeatCount);
         result += " from " + trigger.StartTimeOfDay.ToShortFormat() + " to " + trigger.EndTimeOfDay.ToShortFormat();
 
         if (trigger.DaysOfWeek.Count < 7)
@@ -340,7 +341,7 @@ internal static class Extensions
 
     public static string GetScheduleDescription(this ISimpleTrigger trigger)
     {
-        string result = "Repeat ";
+        var result = "Repeat ";
         if (trigger.RepeatCount > 0)
             result += trigger.RepeatCount + " times ";
         result += "every ";
@@ -366,12 +367,12 @@ internal static class Extensions
 
     public static string GetScheduleDescription(int repeatInterval, IntervalUnit repeatIntervalUnit, int repeatCount = 0)
     {
-        string result = "Repeat ";
+        var result = "Repeat ";
         if (repeatCount > 0)
             result += repeatCount + " times ";
         result += "every ";
 
-        string unitStr = repeatIntervalUnit.ToString().ToLower();
+        var unitStr = repeatIntervalUnit.ToString().ToLower();
 
         if (repeatInterval == 1)
             result += unitStr;
@@ -417,8 +418,8 @@ internal static class Extensions
         foreach (var entry in entries)
         {
             TimeSpan? duration = null;
-            string cssClass = "";
-            string state = "Finished";
+            var cssClass = "";
+            var state = "Finished";
 
             if (entry.FinishedTimeUtc != null)
                 duration = entry.FinishedTimeUtc - entry.ActualFireTimeUtc;

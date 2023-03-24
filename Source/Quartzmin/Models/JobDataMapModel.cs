@@ -4,6 +4,6 @@ namespace Quartzmin.Models;
 
 public class JobDataMapModel
 {
-    public List<JobDataMapItem> Items { get; } = new List<JobDataMapItem>();
+    public List<JobDataMapItem> Items { get; } = new();
     public JobDataMapItem Template { get; set; }
 }

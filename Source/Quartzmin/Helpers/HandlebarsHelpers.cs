@@ -30,7 +30,7 @@ internal class HandlebarsHelpers
 
     private void RegisterInternal()
     {
-        IHandlebars h = _services.Handlebars;
+        var h = _services.Handlebars;
 
         h.RegisterHelper("Upper", (o, c, a) => o.Write(a[0].ToString().ToUpper()));
         h.RegisterHelper("Lower", (o, c, a) => o.Write(a[0].ToString().ToLower()));
@@ -72,7 +72,7 @@ internal class HandlebarsHelpers
     {
         get
         {
-            string url = _services.Options.VirtualPathRoot;
+            var url = _services.Options.VirtualPathRoot;
             if (!url.EndsWith("/"))
                 url += "/";
             return url;
@@ -128,12 +128,12 @@ internal class HandlebarsHelpers
     {
         var dict = arguments[0] as IDictionary<string, object> ?? new Dictionary<string, object> { ["controller"] = arguments[0] };
 
-        string classes = "item";
+        var classes = "item";
         if (dict["controller"].Equals(context.ControllerName))
             classes += " active";
 
-        string url = BaseUrl + dict["controller"];
-        string title = HtmlEncode(dict.GetValue("title", dict["controller"]));
+        var url = BaseUrl + dict["controller"];
+        var title = HtmlEncode(dict.GetValue("title", dict["controller"]));
 
         output.WriteSafeString($@"<a href=""{url}"" class=""{classes}"">{title}</a>");
     }
@@ -145,7 +145,7 @@ internal class HandlebarsHelpers
 
         IDictionary<string, object> routeValues = null;
         string controller = null;
-        string action = (arguments[0] as Page)?.ActionName ?? (string)arguments[0];
+        var action = (arguments[0] as Page)?.ActionName ?? (string)arguments[0];
 
         if (arguments.Length >= 2) // [actionName, controllerName/routeValues ]
         {
@@ -164,7 +164,7 @@ internal class HandlebarsHelpers
         if (controller == null)
             controller = context.ControllerName;
 
-        string url = BaseUrl + controller;
+        var url = BaseUrl + controller;
 
         if (!string.IsNullOrEmpty(action))
             url += "/" + action;

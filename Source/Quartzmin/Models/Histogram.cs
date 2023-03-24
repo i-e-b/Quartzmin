@@ -7,7 +7,7 @@ namespace Quartzmin.Models;
 
 public class Histogram
 {
-    public List<Bar> Bars { get; set; } = new List<Bar>();
+    public List<Bar> Bars { get; set; } = new();
 
     public int ComputedWidth => Bars.Count * BarWidth;
 
@@ -33,8 +33,8 @@ public class Histogram
 
     internal void Layout()
     {
-        double max = Bars.Max(x => x.Value);
-        int i = 0;
+        var max = Bars.Max(x => x.Value);
+        var i = 0;
         foreach (var b in Bars)
         {
             b.ComputedLeft = i * BarWidth;
@@ -48,7 +48,7 @@ public class Histogram
     {
         var hst = new Histogram();
 
-        for (int i = 0; i < 10; i++)
+        for (var i = 0; i < 10; i++)
         {
             hst.Bars.Add(new Bar
             {
@@ -59,7 +59,7 @@ public class Histogram
         return hst;
     }
 
-    private static readonly Lazy<Histogram> _empty = new Lazy<Histogram>(CreateEmpty);
+    private static readonly Lazy<Histogram> _empty = new(CreateEmpty);
 
     public static Histogram Empty => _empty.Value;
 }

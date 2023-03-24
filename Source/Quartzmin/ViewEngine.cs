@@ -7,7 +7,7 @@ namespace Quartzmin;
 public class ViewEngine
 {
     private readonly Services _services;
-    private readonly Dictionary<string, Func<object, string>> _compiledViews = new Dictionary<string, Func<object, string>>(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Func<object, string>> _compiledViews = new(StringComparer.OrdinalIgnoreCase);
 
     public bool UseCache { get; set; }
 

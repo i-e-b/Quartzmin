@@ -185,7 +185,7 @@ public class SimpleTriggerViewModel : IHasValidation
 
 public class DailyTriggerViewModel : IHasValidation
 {
-    public DaysOfWeekViewModel DaysOfWeek { get; set; } = new DaysOfWeekViewModel();
+    public DaysOfWeekViewModel DaysOfWeek { get; set; } = new();
 
     [Required]
     public int? RepeatInterval { get; set; }
@@ -409,10 +409,10 @@ public class TriggerPropertiesViewModel : IHasValidation
     public string TimeFormat { get; } = DateTimeSettings.DefaultTimeFormat;
     public string DateTimeFormat { get => DateFormat + " " + TimeFormat; }
 
-    [SkipValidation] public SimpleTriggerViewModel Simple { get; set; } = new SimpleTriggerViewModel();
-    [SkipValidation] public DailyTriggerViewModel Daily { get; set; } = new DailyTriggerViewModel();
-    [SkipValidation] public CronTriggerViewModel Cron { get; set; } = new CronTriggerViewModel();
-    [SkipValidation] public CalendarTriggerViewModel Calendar { get; set; } = new CalendarTriggerViewModel();
+    [SkipValidation] public SimpleTriggerViewModel Simple { get; set; } = new();
+    [SkipValidation] public DailyTriggerViewModel Daily { get; set; } = new();
+    [SkipValidation] public CronTriggerViewModel Cron { get; set; } = new();
+    [SkipValidation] public CalendarTriggerViewModel Calendar { get; set; } = new();
 
     public bool IsNew { get; set; }
 
@@ -508,7 +508,7 @@ public class TriggerPropertiesViewModel : IHasValidation
             ["cron"] = standardMisfireInstructions,
             ["calendar"] = standardMisfireInstructions,
             ["daily"] = standardMisfireInstructions,
-            ["simple"] = new Dictionary<int, string>
+            ["simple"] = new()
             {
                 [0] = "Smart Policy",
                 [1] = "Fire Now",

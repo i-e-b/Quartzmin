@@ -1,4 +1,5 @@
-﻿namespace Quartzmin;
+﻿#nullable enable
+namespace Quartzmin;
 
 internal static class DateTimeSettings
 {

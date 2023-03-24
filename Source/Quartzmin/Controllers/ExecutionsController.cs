@@ -1,4 +1,5 @@
-﻿using Quartzmin.Helpers;
+﻿#nullable enable
+using Quartzmin.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -35,15 +36,16 @@ public class ExecutionsController : PageControllerBase
 
     public class InterruptArgs
     {
-        public string Id { get; set; }
+        // ReSharper disable once UnusedAutoPropertyAccessor.Global
+        public string? Id { get; set; }
     }
 
     [HttpPost, JsonErrorResponse]
     public async Task<IActionResult> Interrupt([FromBody] InterruptArgs args)
     {
-        if (!await Scheduler.Interrupt(args.Id))
-            throw new InvalidOperationException("Cannot interrupt execution " + args.Id);
+        if (args.Id is null) throw new InvalidOperationException("Cannot interrupt execution, argument is invalid");
+        if (!await Scheduler.Interrupt(args.Id)) throw new InvalidOperationException("Cannot interrupt execution " + args.Id);
 
-        return NoContent();
+        return NoContent()!;
     }
 }

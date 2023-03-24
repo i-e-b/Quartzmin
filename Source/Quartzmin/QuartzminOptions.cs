@@ -25,7 +25,7 @@ public class QuartzminOptions
     /// <summary>
     /// Supported value types in job data map.
     /// </summary>
-    public List<TypeHandlerBase> StandardTypes { get; } = new List<TypeHandlerBase>();
+    public List<TypeHandlerBase> StandardTypes { get; } = new();
 
     /// <summary>
     /// Default type for new job data map item.

@@ -1,4 +1,5 @@
-﻿namespace Quartz.Plugins.RecentHistory;
+﻿#nullable enable
+namespace Quartz.Plugins.RecentHistory;
 
 public static class Extensions
 {
@@ -7,8 +8,8 @@ public static class Extensions
         context.Put(typeof(IExecutionHistoryStore).FullName, store);
     }
 
-    public static IExecutionHistoryStore GetExecutionHistoryStore(this SchedulerContext context)
+    public static IExecutionHistoryStore? GetExecutionHistoryStore(this SchedulerContext context)
     {
-        return (IExecutionHistoryStore)context.Get(typeof(IExecutionHistoryStore).FullName);
+        return context.Get(typeof(IExecutionHistoryStore).FullName) as IExecutionHistoryStore;
     }
 }

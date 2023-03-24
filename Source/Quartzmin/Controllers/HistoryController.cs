@@ -1,4 +1,5 @@
-﻿using Quartz.Plugins.RecentHistory;
+﻿#nullable enable
+using Quartz.Plugins.RecentHistory;
 using System;
 using System.Linq;
 using System.Collections.Generic;
@@ -16,10 +17,9 @@ public class HistoryController : PageControllerBase
 
         ViewBag.HistoryEnabled = store != null;
 
-        if (store == null)
-            return View(null);
+        if (store == null) return View(null);
 
-        IEnumerable<ExecutionHistoryEntry> history = await store.FilterLast(100);
+        var history = await store.FilterLast(100);
 
         var list = new List<object>();
 

@@ -1,10 +1,11 @@
-﻿using System.Collections.Generic;
+﻿#nullable enable
+using System.Collections.Generic;
 
 namespace CronExpressionDescriptor;
 
 internal static class Resources
 {
-    private static readonly Dictionary<string, string> _strings = new Dictionary<string, string>
+    private static readonly Dictionary<string, string> _strings = new()
     {
         ["AMPeriod"] = "AM",
         ["AnErrorOccuredWhenGeneratingTheExpressionD"] = "An error occured when generating the expression description.  Check the cron expression syntax.",

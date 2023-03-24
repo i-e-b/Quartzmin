@@ -36,13 +36,13 @@ public abstract partial class PageControllerBase : ControllerBase
 
 public abstract partial class PageControllerBase
 {
-    protected IScheduler Scheduler => Services.Scheduler;
+    protected IScheduler Scheduler => Services.Scheduler ?? throw new Exception($"Internal error: No scheduler in {nameof(PageControllerBase)}");
 
     protected dynamic ViewBag { get; } = new ExpandoObject();
 
     internal class Page
     {
-        private PageControllerBase _controller;
+        private readonly PageControllerBase _controller;
 
         public string ControllerName => _controller.GetRouteData("controller");
 
@@ -54,25 +54,27 @@ public abstract partial class PageControllerBase
 
         public object Model { get; set; }
 
-        public Page(PageControllerBase controller, object model = null)
+        public Page(PageControllerBase controller, object? model = null)
         {
             _controller = controller;
-            Model = model;
+            Model = model ?? new {};
         }
     }
 
-    protected IActionResult View(object model)
+    protected IActionResult View(object? model)
     {
         return View(GetRouteData("action"), model);
     }
 
-    protected IActionResult View(string viewName, object model)
+    protected IActionResult View(string viewName, object? model)
     {
-        string content = Services.ViewEngine.Render($"{GetRouteData("controller")}/{viewName}.hbs", new Page(this, model));
+        var engine = Services.ViewEngine;
+        if (engine is null) return StatusCode(500)!;
+        var content = engine.Render($"{GetRouteData("controller")}/{viewName}.hbs", new Page(this, model));
         return Html(content);
     }
 
-    protected IActionResult Html(string html)
+    protected static IActionResult Html(string? html)
     {
         return new ContentResult
         {
@@ -81,18 +83,19 @@ public abstract partial class PageControllerBase
         };
     }
 
-    protected string GetETag()
+    protected string? GetETag()
     {
-        IEnumerable<string> values = GetHeader("If-None-Match");
-        if (values == null)
-            return null;
-        else
-            return new System.Net.Http.Headers.EntityTagHeaderValue(values.FirstOrDefault()).Tag;
+        var values = GetHeader("If-None-Match");
+
+        var first = values?.FirstOrDefault();
+        if (first is null) return null;
+        
+        return new System.Net.Http.Headers.EntityTagHeaderValue(first).Tag;
     }
 
     public IActionResult TextFile(string content, string contentType, DateTime lastModified, string etag)
     {
-        Response.Headers.Add("Last-Modified", lastModified.ToUniversalTime().ToString("R"));
+        Response!.Headers!.Add("Last-Modified", lastModified.ToUniversalTime().ToString("R"));
         Response.Headers.Add("ETag", etag);
         return new ContentResult
         {
@@ -101,9 +104,9 @@ public abstract partial class PageControllerBase
         };
     }
 
-    protected JobDataMapItem JobDataMapItemTemplate => new JobDataMapItem
+    protected JobDataMapItem JobDataMapItemTemplate => new()
     {
-        SelectedType = Services.Options.DefaultSelectedType,
-        SupportedTypes = Services.Options.StandardTypes.Order(),
+        SelectedType = Services.Options!.DefaultSelectedType,
+        SupportedTypes = Services.Options.StandardTypes!.Order(),
     };
 }
