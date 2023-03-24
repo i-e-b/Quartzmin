@@ -5,145 +5,135 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-
-#region Target-Specific Directives
-#if NETSTANDARD
 using Microsoft.AspNetCore.Mvc;
-#endif
-#if NETFRAMEWORK
-using System.Web.Http;
-using IActionResult = System.Web.Http.IHttpActionResult;
-#endif
-#endregion
 
-namespace Quartzmin.Controllers
+namespace Quartzmin.Controllers;
+
+public class CalendarsController : PageControllerBase
 {
-    public class CalendarsController : PageControllerBase
+    [HttpGet]
+    public async Task<IActionResult> Index()
     {
-        [HttpGet]
-        public async Task<IActionResult> Index()
+        var calendarNames = await Scheduler.GetCalendarNames();
+
+        var list = new List<CalendarListItem>();
+
+        foreach (string name in calendarNames)
         {
-            var calendarNames = await Scheduler.GetCalendarNames();
-
-            var list = new List<CalendarListItem>();
-
-            foreach (string name in calendarNames)
-            {
-                var cal = await Scheduler.GetCalendar(name);
-                list.Add(new CalendarListItem() { Name = name, Description = cal.Description, Type = cal.GetType() });
-            }
+            var cal = await Scheduler.GetCalendar(name);
+            list.Add(new CalendarListItem { Name = name, Description = cal.Description, Type = cal.GetType() });
+        }
             
-            return View(list);
+        return View(list);
+    }
+
+    [HttpGet]
+    public IActionResult New()
+    {
+        ViewBag.IsNew = true;
+        return View("Edit", new[] { new CalendarViewModel
+        {
+            IsRoot = true,
+            Type = "cron",
+            TimeZone = TimeZoneInfo.Local.Id,
+        }});
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Edit(string name)
+    {
+        var calendar = await Scheduler.GetCalendar(name);
+
+        var model = calendar.Flatten().Select(x => CalendarViewModel.FromCalendar(x)).ToArray();
+
+        if (model.Any())
+        {
+            model[0].IsRoot = true;
+            model[0].Name = name;
         }
 
-        [HttpGet]
-        public IActionResult New()
+        ViewBag.IsNew = false;
+
+        return View(model);
+    }
+
+    private void RemoveLastEmpty(List<string> list)
+    {
+        if (list?.Count > 0 && string.IsNullOrEmpty(list.Last()))
+            list.RemoveAt(list.Count - 1);
+    }
+
+    [HttpPost, JsonErrorResponse]
+    public async Task<IActionResult> Save([FromBody] CalendarViewModel[] chain, bool isNew)
+    {
+        var result = new ValidationResult();
+
+        if (chain.Length == 0 || string.IsNullOrEmpty(chain[0].Name))
+            result.Errors.Add(ValidationError.EmptyField(nameof(CalendarViewModel.Name)));
+
+        for (int i = 0; i < chain.Length; i++)
         {
-            ViewBag.IsNew = true;
-            return View("Edit", new[] { new CalendarViewModel()
-            {
-                IsRoot = true,
-                Type = "cron",
-                TimeZone = TimeZoneInfo.Local.Id,
-            }});
+            RemoveLastEmpty(chain[i].Days);
+            RemoveLastEmpty(chain[i].Dates);
+
+            var errors = new List<ValidationError>();
+            chain[i].Validate(errors);
+            errors.ForEach(x => x.SegmentIndex = i);
+            result.Errors.AddRange(errors);
         }
-
-        [HttpGet]
-        public async Task<IActionResult> Edit(string name)
+            
+        if (result.Success)
         {
-            var calendar = await Scheduler.GetCalendar(name);
+            string name = chain[0].Name;
 
-            var model = calendar.Flatten().Select(x => CalendarViewModel.FromCalendar(x)).ToArray();
+            ICalendar existing = null;
 
-            if (model.Any())
-            {
-                model[0].IsRoot = true;
-                model[0].Name = name;
-            }
+            if (isNew == false)
+                existing = await Scheduler.GetCalendar(name);
 
-            ViewBag.IsNew = false;
-
-            return View(model);
-        }
-
-        private void RemoveLastEmpty(List<string> list)
-        {
-            if (list?.Count > 0 && string.IsNullOrEmpty(list.Last()))
-                list.RemoveAt(list.Count - 1);
-        }
-
-        [HttpPost, JsonErrorResponse]
-        public async Task<IActionResult> Save([FromBody] CalendarViewModel[] chain, bool isNew)
-        {
-            var result = new ValidationResult();
-
-            if (chain.Length == 0 || string.IsNullOrEmpty(chain[0].Name))
-                result.Errors.Add(ValidationError.EmptyField(nameof(CalendarViewModel.Name)));
-
+            ICalendar root = null, current = null;
             for (int i = 0; i < chain.Length; i++)
             {
-                RemoveLastEmpty(chain[i].Days);
-                RemoveLastEmpty(chain[i].Dates);
+                ICalendar newCal = chain[i].Type.Equals("custom") ? existing : chain[i].BuildCalendar();
 
-                var errors = new List<ValidationError>();
-                chain[i].Validate(errors);
-                errors.ForEach(x => x.SegmentIndex = i);
-                result.Errors.AddRange(errors);
-            }
-            
-            if (result.Success)
-            {
-                string name = chain[0].Name;
+                if (newCal == null)
+                    break;
 
-                ICalendar existing = null;
-
-                if (isNew == false)
-                    existing = await Scheduler.GetCalendar(name);
-
-                ICalendar root = null, current = null;
-                for (int i = 0; i < chain.Length; i++)
-                {
-                    ICalendar newCal = chain[i].Type.Equals("custom") ? existing : chain[i].BuildCalendar();
-
-                    if (newCal == null)
-                        break;
-
-                    if (i == 0)
-                        root = newCal;
-                    else
-                        current.CalendarBase = newCal;
-
-                    current = newCal;
-                    existing = existing?.CalendarBase;
-                }
-                
-                if (root == null)
-                {
-                    result.Errors.Add(new ValidationError() { Field = nameof(CalendarViewModel.Type), Reason = "Cannot create calendar.", SegmentIndex = 0 });
-                }
+                if (i == 0)
+                    root = newCal;
                 else
-                {
-                    await Scheduler.AddCalendar(name, root, replace: true, updateTriggers: true);
-                }
+                    current.CalendarBase = newCal;
+
+                current = newCal;
+                existing = existing?.CalendarBase;
             }
-
-            return Json(result);
+                
+            if (root == null)
+            {
+                result.Errors.Add(new ValidationError { Field = nameof(CalendarViewModel.Type), Reason = "Cannot create calendar.", SegmentIndex = 0 });
+            }
+            else
+            {
+                await Scheduler.AddCalendar(name, root, replace: true, updateTriggers: true);
+            }
         }
 
-        public class DeleteArgs
-        {
-            public string Name { get; set; }
-        }
-
-
-        [HttpPost, JsonErrorResponse]
-        public async Task<IActionResult> Delete([FromBody] DeleteArgs args)
-        {
-            if (!await Scheduler.DeleteCalendar(args.Name))
-                throw new InvalidOperationException("Cannot delete calendar " + args.Name);
-
-            return NoContent();
-        }
-
+        return Json(result);
     }
+
+    public class DeleteArgs
+    {
+        public string Name { get; set; }
+    }
+
+
+    [HttpPost, JsonErrorResponse]
+    public async Task<IActionResult> Delete([FromBody] DeleteArgs args)
+    {
+        if (!await Scheduler.DeleteCalendar(args.Name))
+            throw new InvalidOperationException("Cannot delete calendar " + args.Name);
+
+        return NoContent();
+    }
+
 }

@@ -2,60 +2,59 @@
 using System.Collections.Generic;
 using System.Globalization;
 
-namespace Quartzmin
+namespace Quartzmin;
+
+public class ViewEngine
 {
-    public class ViewEngine
+    private readonly Services _services;
+    private readonly Dictionary<string, Func<object, string>> _compiledViews = new Dictionary<string, Func<object, string>>(StringComparer.OrdinalIgnoreCase);
+
+    public bool UseCache { get; set; }
+
+    public ViewEngine(Services services)
     {
-        readonly Services _services;
-        readonly Dictionary<string, Func<object, string>> _compiledViews = new Dictionary<string, Func<object, string>>(StringComparer.OrdinalIgnoreCase);
+        _services = services;
+        UseCache = string.IsNullOrEmpty(services.Options.ViewsRootDirectory);
+    }
 
-        public bool UseCache { get; set; }
-
-        public ViewEngine(Services services)
+    private Func<object, string> GetRenderDelegate(string templatePath)
+    {
+        if (UseCache)
         {
-            _services = services;
-            UseCache = string.IsNullOrEmpty(services.Options.ViewsRootDirectory);
-        }
-
-        Func<object, string> GetRenderDelegate(string templatePath)
-        {
-            if (UseCache)
+            lock (_compiledViews)
             {
-                lock (_compiledViews)
+                if (!_compiledViews.ContainsKey(templatePath))
                 {
-                    if (!_compiledViews.ContainsKey(templatePath))
-                    {
-                        _compiledViews[templatePath] = _services.Handlebars.CompileView(templatePath);
-                    }
-
-                    return _compiledViews[templatePath];
+                    _compiledViews[templatePath] = _services.Handlebars.CompileView(templatePath);
                 }
-            }
-            else
-            {
-                return _services.Handlebars.CompileView(templatePath);
+
+                return _compiledViews[templatePath];
             }
         }
-
-        public string Render(string templatePath, object model)
+        else
         {
-            return GetRenderDelegate(templatePath)(model);
+            return _services.Handlebars.CompileView(templatePath);
         }
+    }
 
-        public string Encode(object value)
-        {
-            return _services.Handlebars.Configuration.TextEncoder.Encode(string.Format(CultureInfo.InvariantCulture, "{0}", value));
-        }
+    public string Render(string templatePath, object model)
+    {
+        return GetRenderDelegate(templatePath)(model);
+    }
 
-        public string ErrorPage(Exception ex)
+    public string Encode(object value)
+    {
+        return _services.Handlebars.Configuration.TextEncoder.Encode(string.Format(CultureInfo.InvariantCulture, "{0}", value));
+    }
+
+    public string ErrorPage(Exception ex)
+    {
+        return Render("Error.hbs", new
         {
-            return Render("Error.hbs", new
-            {
-                ex.GetBaseException().GetType().FullName,
-                Exception = ex,
-                BaseException = ex.GetBaseException(),
-                Dump = ex.ToString()
-            });
-        }
+            ex.GetBaseException().GetType().FullName,
+            Exception = ex,
+            BaseException = ex.GetBaseException(),
+            Dump = ex.ToString()
+        });
     }
 }

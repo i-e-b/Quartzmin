@@ -1,9 +1,8 @@
 ﻿using System.Collections.Generic;
 
-namespace Quartzmin.Models
+namespace Quartzmin.Models;
+
+public interface IHasValidation
 {
-    public interface IHasValidation
-    {
-        void Validate(ICollection<ValidationError> errors);
-    }
+    void Validate(ICollection<ValidationError> errors);
 }

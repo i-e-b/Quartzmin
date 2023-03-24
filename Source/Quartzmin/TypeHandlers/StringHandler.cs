@@ -1,31 +1,30 @@
 ﻿using System;
 
-namespace Quartzmin.TypeHandlers
+namespace Quartzmin.TypeHandlers;
+
+[EmbeddedTypeHandlerResources(nameof(StringHandler))]
+public class StringHandler : TypeHandlerBase
 {
-    [EmbeddedTypeHandlerResources(nameof(StringHandler))]
-    public class StringHandler : TypeHandlerBase
+    public bool IsMultiline { get; set; }
+
+    public override bool CanHandle(object value)
     {
-        public bool IsMultiline { get; set; }
+        if (value is string str)
+            return (str.IndexOf('\n') != -1) == IsMultiline;
 
-        public override bool CanHandle(object value)
+        return false;
+    }
+
+    public override object ConvertFrom(object value)
+    {
+        if (value is string str)
         {
-            if (value is string str)
-                return (str.IndexOf('\n') != -1) == IsMultiline;
+            if (IsMultiline == false)
+                return str.Substring(0, Math.Min(str.Length, 0x10000)); // for simple string field, constrain maximum length
 
-            return false;
+            return str;
         }
 
-        public override object ConvertFrom(object value)
-        {
-            if (value is string str)
-            {
-                if (IsMultiline == false)
-                    return str.Substring(0, Math.Min(str.Length, 0x10000)); // for simple string field, constrain maximum length
-
-                return str;
-            }
-
-            return null;
-        }
+        return null;
     }
 }
