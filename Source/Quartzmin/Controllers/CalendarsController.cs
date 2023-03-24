@@ -24,7 +24,7 @@ public class CalendarsController : PageControllerBase
             if (string.IsNullOrEmpty(name)) continue;
             var cal = await Scheduler.GetCalendar(name);
             if (cal is null) continue;
-            list.Add(new CalendarListItem { Name = name, Description = cal.Description, Type = cal.GetType() });
+            list.Add(new CalendarListItem(name: name, description: cal.Description ?? "", type: cal.GetType()));
         }
             
         return View(list);

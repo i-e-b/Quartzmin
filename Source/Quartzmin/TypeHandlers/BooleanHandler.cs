@@ -1,14 +1,15 @@
-﻿namespace Quartzmin.TypeHandlers;
+﻿#nullable enable
+namespace Quartzmin.TypeHandlers;
 
 [EmbeddedTypeHandlerResources(nameof(BooleanHandler))]
 public class BooleanHandler : TypeHandlerBase
 {
-    public override bool CanHandle(object value)
+    public override bool CanHandle(object? value)
     {
         return value is bool;
     }
 
-    public override object ConvertFrom(object value)
+    public override object? ConvertFrom(object? value)
     {
         if (value is bool)
             return value;
@@ -19,5 +20,5 @@ public class BooleanHandler : TypeHandlerBase
         return null;
     }
 
-    public override string ConvertToString(object value) => base.ConvertToString(value ?? false);
+    public override string? ConvertToString(object? value) => base.ConvertToString(value ?? false);
 }

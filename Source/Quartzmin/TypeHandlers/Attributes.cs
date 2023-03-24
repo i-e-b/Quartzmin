@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.IO;
 using System.Reflection;
 using System.Text;
@@ -8,8 +9,8 @@ namespace Quartzmin.TypeHandlers;
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
 public class TypeHandlerResourcesAttribute : Attribute
 {
-    public string Template { get; set; }
-    public string Script { get; set; }
+    public string? Template { get; set; }
+    public string? Script { get; set; }
 
     public static TypeHandlerResourcesAttribute GetResolved(Type type)
     {
@@ -23,21 +24,21 @@ public class TypeHandlerResourcesAttribute : Attribute
 }
 
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
-public class EmbeddedTypeHandlerResourcesAttribute : TypeHandlerResourcesAttribute
+public sealed class EmbeddedTypeHandlerResourcesAttribute : TypeHandlerResourcesAttribute
 {
     /// <summary>
     /// Should override when used in another assembly.
     /// </summary>
-    protected virtual Assembly Assembly => Assembly.GetExecutingAssembly();
+    private Assembly Assembly => Assembly.GetExecutingAssembly();
     /// <summary>
     /// Should override when used in another assembly.
     /// </summary>
-    protected virtual string Namespace => typeof(EmbeddedTypeHandlerResourcesAttribute).Namespace;
+    private string Namespace => typeof(EmbeddedTypeHandlerResourcesAttribute).Namespace;
 
     protected override void Resolve()
     {
-        Script = Script ?? GetManifestResourceString($"{_name}.js");
-        Template = Template ?? GetManifestResourceString($"{_name}.hbs");
+        Script ??= GetManifestResourceString($"{_name}.js");
+        Template ??= GetManifestResourceString($"{_name}.hbs");
     }
 
     private readonly string _name;
@@ -46,7 +47,7 @@ public class EmbeddedTypeHandlerResourcesAttribute : TypeHandlerResourcesAttribu
         _name = name;
     }
 
-    protected string GetManifestResourceString(string name)
+    private string GetManifestResourceString(string name)
     {
         var fullName = $"{Namespace}.{name}";
         using var stream = Assembly.GetManifestResourceStream(fullName);

@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -10,49 +11,42 @@ public class EnumHandler : OptionSetHandler
 {
     public Type EnumType { get; set; }
 
-    public EnumHandler() { }
+    public EnumHandler() {
+        EnumType = typeof(object);
+    }
     public EnumHandler(Type enumType)
     {
         EnumType = enumType;
-        Name = EnumType.FullName;
+        Name = EnumType.FullName ?? EnumType.Name;
         DisplayName = EnumType.Name;
     }
 
-    public override bool CanHandle(object value)
+    public override bool CanHandle(object? value)
     {
-        if (value == null)
-            return false;
-
-        return EnumType.IsAssignableFrom(value.GetType());
+        return value != null && EnumType.IsInstanceOfType(value);
     }
 
-    public override object ConvertFrom(object value)
+    public override object? ConvertFrom(object? value)
     {
-        if (value == null)
-            return null;
+        if (value == null) return null;
 
-        if (EnumType.IsAssignableFrom(value.GetType()))
-            return value;
+        if (EnumType.IsInstanceOfType(value)) return value;
 
-        if (value is string str)
+        if (value is not string str) return null;
+        try
         {
-            try
-            {
-                return Enum.Parse(EnumType, str, true);
-            }
-            catch
-            {
-                return null;
-            }
+            return Enum.Parse(EnumType, str, true);
         }
-
-        return null;
+        catch
+        {
+            return null;
+        }
     }
 
     private string GetDisplayName(string enumValue)
     {
-        return EnumType?
-            .GetMember(enumValue)?.First()?
+        return EnumType
+            .GetMember(enumValue).First()
             .GetCustomAttribute<DisplayAttribute>()?
             .Name ?? enumValue;
     }

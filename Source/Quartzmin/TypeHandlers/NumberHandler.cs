@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 
@@ -18,26 +19,24 @@ public class NumberHandler : TypeHandlerBase
 
     public UnderlyingType NumberType { get; set; }
 
-    public Type GetClrType() => _clrTypes[NumberType];
+    public Type? GetClrType() => _clrTypes[NumberType];
 
     public NumberHandler() { }
 
     public NumberHandler(UnderlyingType numberType)
     {
         NumberType = numberType;
-        Name = NumberType.ToString();
+        Name = NumberType.ToString()!;
         DisplayName = Name;
     }
 
-    public override bool CanHandle(object value)
+    public override bool CanHandle(object? value)
     {
-        if (value == null)
-            return false;
-
-        return GetClrType().IsAssignableFrom(value.GetType());
+        if (value == null) return false;
+        return GetClrType()?.IsInstanceOfType(value) == true;
     }
 
-    public override object ConvertFrom(object value)
+    public override object? ConvertFrom(object? value)
     {
         var cult = CultureInfo.InvariantCulture;
 
@@ -59,7 +58,8 @@ public class NumberHandler : TypeHandlerBase
 
         if (value is decimal || value is double || value is float || value is int || value is long)
         {
-            return Convert.ChangeType(value, GetClrType(), cult);
+            var clrType = GetClrType();
+            if (clrType is not null) return Convert.ChangeType(value, clrType, cult);
         }
 
         return null;

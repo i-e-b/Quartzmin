@@ -56,10 +56,9 @@ internal static class Resources
         ["WeekdayNearestDayX0"] = "weekday nearest day {0}",
     };
 
-    public static string GetString(string name)
+    public static string? GetString(string name)
     {
-        if (_strings.TryGetValue(name, out var result))
-            return result;
+        if (_strings.TryGetValue(name, out var result)) return result;
         return null;
     }
 }

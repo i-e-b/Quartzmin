@@ -1,4 +1,5 @@
-﻿using Quartzmin.TypeHandlers;
+﻿#nullable enable
+using Quartzmin.TypeHandlers;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -8,16 +9,16 @@ namespace Quartzmin.Models;
 public class JobDataMapItemBase : IHasValidation
 {
     [Required]
-    public string Name { get; set; }
+    public string? Name { get; set; }
 
-    public object Value { get; set; }
+    public object? Value { get; set; }
 
     [Required]
-    public TypeHandlerBase SelectedType { get; set; }
+    public TypeHandlerBase? SelectedType { get; set; }
 
     public bool IsLast { get; set; }
 
-    public string RowId { get; set; }
+    public string? RowId { get; set; }
 
     private const string NameField = "data-map[name]";
     private const string HandlerField = "data-map[handler]";
@@ -28,7 +29,7 @@ public class JobDataMapItemBase : IHasValidation
 
     public static JobDataMapItemBase FromDictionary(Dictionary<string, object> formData, Services services)
     {
-        var valueFormData = new Dictionary<string, object>();
+        var valueFormData = new Dictionary<string, object?>();
 
         var result = new JobDataMapItemBase();
 
@@ -36,12 +37,12 @@ public class JobDataMapItemBase : IHasValidation
         {
             if (item.Key == NameField)
             {
-                result.Name = (string)item.Value;
+                result.Name = item.Value as string;
                 continue;
             }
             if (item.Key == HandlerField)
             {
-                result.SelectedType = services.TypeHandlers.Deserialize((string)item.Value);
+                if (item.Value is string value) result.SelectedType = services.TypeHandlers.Deserialize(value);
                 continue;
             }
             if (item.Key == TypeField)
@@ -50,12 +51,12 @@ public class JobDataMapItemBase : IHasValidation
             }
             if (item.Key == IndexField)
             {
-                result.RowId = (string)item.Value;
+                result.RowId = item.Value as string;
                 continue;
             }
             if (item.Key == LastItemField)
             {
-                result.IsLast = Convert.ToBoolean(item.Value);
+                if (item.Value is not null) result.IsLast = Convert.ToBoolean(item.Value);
                 continue;
             }
 
@@ -70,20 +71,13 @@ public class JobDataMapItemBase : IHasValidation
 
     public override string ToString()
     {
-        if (Name != null)
-        {
-            if (Value != null)
-                return $"{Name} = {Value}";
-            else
-                return Name;
-        }
-
-        return base.ToString();
+        if (Name == null) return base.ToString() ?? "";
+        return Value != null ? $"{Name} = {Value}" : Name;
     }
 
     public void Validate(ICollection<ValidationError> errors)
     {
-        if (string.IsNullOrEmpty(Name))
+        if (string.IsNullOrEmpty(Name!))
             AddValidationError(NameField, errors);
 
         if (SelectedType == null)

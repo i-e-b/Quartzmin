@@ -1,6 +1,8 @@
-﻿using HandlebarsDotNet;
+﻿#nullable enable
+using HandlebarsDotNet;
 using System.IO;
 using System.Reflection;
+
 using System.Text;
 
 namespace Quartzmin;
@@ -11,13 +13,13 @@ public static class ViewFileSystemFactory
     {
         ViewEngineFileSystem fs;
 
-        if (string.IsNullOrEmpty(options.ViewsRootDirectory))
+        if (options.ViewsRootDirectory.IsNullOrEmpty())
         {
             fs = new EmbeddedFileSystem();
         }
         else
         {
-            fs = new DiskFileSystem(options.ViewsRootDirectory);
+            fs = new DiskFileSystem(options.ViewsRootDirectory!);
         }
 
         return fs;
@@ -25,11 +27,11 @@ public static class ViewFileSystemFactory
 
     private class DiskFileSystem : ViewEngineFileSystem
     {
-        private string root;
+        private readonly string _root;
 
         public DiskFileSystem(string root)
         {
-            this.root = root;
+            this._root = root;
         }
 
         public override string GetFileContent(string filename)
@@ -49,13 +51,13 @@ public static class ViewFileSystemFactory
 
         private string GetFullPath(string filePath)
         {
-            return Path.Combine(root, filePath.Replace("partials/", "Partials/").Replace('/', Path.DirectorySeparatorChar));
+            return Path.Combine(_root, filePath.Replace("partials/", "Partials/").Replace('/', Path.DirectorySeparatorChar));
         }
     }
 
     private class EmbeddedFileSystem : ViewEngineFileSystem
     {
-        public override string GetFileContent(string filename)
+        public override string? GetFileContent(string filename)
         {
             using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(GetFullPath(filename));
             if (stream == null)

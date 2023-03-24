@@ -8,15 +8,15 @@ public class Options
 {
     public Options()
     {
-        this.ThrowExceptionOnParseError = true;
-        this.Verbose = false;
-        this.DayOfWeekStartIndexZero = true;
-        this.Use24HourTimeFormat = true;
+        ThrowExceptionOnParseError = true;
+        Verbose = false;
+        DayOfWeekStartIndexZero = true;
+        Use24HourTimeFormat = true;
     }
 
     public bool ThrowExceptionOnParseError { get; set; }
     public bool Verbose { get; set; }
     public bool DayOfWeekStartIndexZero { get; set; }
     public bool? Use24HourTimeFormat { get; set; }
-    public string Locale { get; set; }
+    public string Locale { get; set; } = "en";
 }

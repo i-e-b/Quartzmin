@@ -34,14 +34,14 @@ public class TriggersController : PageControllerBase
                 JobKey = t.JobKey.ToString(),
                 JobGroup = t.JobKey.Group,
                 JobName = t.JobKey.Name,
-                ScheduleDescription = t.GetScheduleDescription(),
+                ScheduleDescription = t.GetScheduleDescription() ?? "",
                 History = Histogram.Empty,
                 StartTime = t.StartTimeUtc.UtcDateTime.ToDefaultFormat(),
                 EndTime = t.FinalFireTimeUtc?.UtcDateTime.ToDefaultFormat(),
                 LastFireTime = t.GetPreviousFireTimeUtc()?.UtcDateTime.ToDefaultFormat(),
                 NextFireTime = t.GetNextFireTimeUtc()?.UtcDateTime.ToDefaultFormat(),
                 ClrType = t.GetType().Name,
-                Description = t.Description,
+                Description = t.Description ?? ""
             });
         }
 

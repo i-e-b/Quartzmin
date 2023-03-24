@@ -1,4 +1,5 @@
-﻿using JsonSubTypes;
+﻿#nullable enable
+using JsonSubTypes;
 using Newtonsoft.Json;
 using Quartzmin.TypeHandlers;
 using System;
@@ -18,50 +19,42 @@ public class TypeHandlerService
 
     public DateTime LastModified { get; private set; }
 
-    private JsonSerializerSettings _jsonSerializerSettings = null;
+    private volatile JsonSerializerSettings? _jsonSerializerSettings;
     private JsonSerializerSettings JsonSerializerSettings
     {
         get
         {
-            if (_jsonSerializerSettings == null)
+            if (_jsonSerializerSettings != null) return _jsonSerializerSettings;
+            lock (this)
             {
-                lock (this)
-                {
-                    if (_jsonSerializerSettings == null)
-                    {
-                        var jss = new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore };
-                        jss.Converters.Add(_builder.Build());
-                        _jsonSerializerSettings = jss;
-                    }
-                }
+                if (_jsonSerializerSettings != null) return _jsonSerializerSettings;
+                var jss = new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore };
+                jss.Converters.Add(_builder.Build());
+                _jsonSerializerSettings = jss;
+                return jss;
             }
-
-            return _jsonSerializerSettings;
         }
     }
 
     private class TypeHandlerDescriptor
     {
-        public Type Type { get; set; }
+        public Type Type { get; set; }=typeof(object);
 
-        public string TypeId { get; set; }
+        public string TypeId { get; set; }="Invalid";
 
-        public Func<object, string> Render { get; set; }
+        public Func<object, string>? Render { get; set; }
 
-        public TypeHandlerResourcesAttribute Resources { get; set; }
+        public TypeHandlerResourcesAttribute? Resources { get; set; }
     }
 
     public TypeHandlerService(Services services)
     {
         _services = services;
 
-        _builder = JsonSubtypesConverterBuilder.Of(typeof(TypeHandlerBase), nameof(TypeHandlerBase.TypeId));
-            
-        if (services?.Options?.StandardTypes != null)
-        {
-            foreach (var typeHandler in services.Options.StandardTypes.Select(x => x.GetType()).Distinct())
-                Register(typeHandler);
-        }
+        _builder = JsonSubtypesConverterBuilder.Of(typeof(TypeHandlerBase), nameof(TypeHandlerBase.TypeId)) ?? throw new Exception("Failed to created type handler service");
+
+        foreach (var typeHandler in services.Options.StandardTypes.Select(x => x.GetType()).Distinct())
+            Register(typeHandler);
 
         Register(typeof(UnsupportedTypeHandler));
     }
@@ -78,7 +71,8 @@ public class TypeHandlerService
             Resources = TypeHandlerResourcesAttribute.GetResolved(type),
         };
 
-        desc.Render = _services.Handlebars.Compile(desc.Resources.Template);
+        var template = desc.Resources?.Template;
+        if (template is not null) desc.Render = _services.Handlebars.Compile(template);
 
         _handlers.Add(type, desc);
 
@@ -90,24 +84,25 @@ public class TypeHandlerService
         LastModified = DateTime.UtcNow;
     }
 
-    public TypeHandlerBase Deserialize(string str) => JsonConvert.DeserializeObject<TypeHandlerBase>(Encoding.UTF8.GetString(Convert.FromBase64String(str)), JsonSerializerSettings);
+    public TypeHandlerBase? Deserialize(string str) => JsonConvert.DeserializeObject<TypeHandlerBase>(Encoding.UTF8.GetString(Convert.FromBase64String(str)), JsonSerializerSettings);
 
     public string Serialize(TypeHandlerBase typeHandler) => Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(typeHandler, JsonSerializerSettings)));
 
     public string Render(TypeHandlerBase typeHandler, object model)
     {
         if (_handlers.TryGetValue(typeHandler.GetType(), out var desc))
-            return desc.Render(model);
-        else
-            throw new InvalidOperationException("Type handler not registered: " + typeHandler.GetType().FullName);
+        {
+            if (desc?.Render is not null) return desc.Render(model) ?? "";
+        }
+        throw new InvalidOperationException("Type handler not registered: " + typeHandler.GetType().FullName);
     }
 
     public Dictionary<string, string> GetScripts()
     {
         return _handlers.Values
-            .Select(x => new { x.TypeId, x.Resources.Script })
+            .Select(x => new { x.TypeId, x.Resources?.Script })
             .ToArray()
-            .Where(x => !string.IsNullOrWhiteSpace(x.Script))
-            .ToDictionary(x => x.TypeId, x => x.Script);
+            .Where(x => x?.Script.IsNullOrWhiteSpace() == false)
+            .ToDictionary(x => x.TypeId, x => x.Script!);
     }
 }

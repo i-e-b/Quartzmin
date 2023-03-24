@@ -16,22 +16,24 @@ public class JobDataMapController : PageControllerBase
     [HttpPost, JsonErrorResponse]
     public async Task<IActionResult> ChangeType()
     {
-        var formData = await Request.GetFormData();
+        var formData = await Request!.GetFormData();
 
-        TypeHandlerBase selectedType, targetType;
+        TypeHandlerBase? selectedType, targetType;
         try
         {
             selectedType = Services.TypeHandlers.Deserialize((string)formData.First(x => x.Key == "selected-type").Value);
             targetType = Services.TypeHandlers.Deserialize((string)formData.First(x => x.Key == "target-type").Value);
         }
-        catch (JsonSerializationException ex) when (ex.Message.StartsWith("Could not create an instance of type"))
+        catch (JsonSerializationException ex) when ((ex.Message ?? "").StartsWith("Could not create an instance of type"))
         {
             return new BadRequestResult { ReasonPhrase = "Unknown Type Handler" };
         }
 
+        if (selectedType is null || targetType is null) return new BadRequestResult { ReasonPhrase = "Unknown Type Handler" };
+        
         var dataMapForm = (await formData.GetJobDataMapForm(includeRowIndex: false)).SingleOrDefault(); // expected single row
-
-        var oldValue = selectedType.ConvertFrom(dataMapForm);
+        
+        var oldValue = dataMapForm is null ? null : selectedType.ConvertFrom(dataMapForm!);
 
         // phase 1: direct conversion
         var newValue = targetType.ConvertFrom(oldValue);
@@ -42,6 +44,8 @@ public class JobDataMapController : PageControllerBase
             var str = selectedType.ConvertToString(oldValue);
             newValue = targetType.ConvertFrom(str);
         }
+        
+        if (newValue is null) newValue = "Failed to convert";
 
         return Html(targetType.RenderView(Services, newValue));
     }
@@ -60,7 +64,7 @@ public class JobDataMapController : PageControllerBase
     [HttpGet, ActionName("TypeHandlers.js")]
     public IActionResult TypeHandlersScript()
     {
-        var etag = Services.TypeHandlers!.LastModified.ETag();
+        var etag = Services.TypeHandlers.LastModified.ETag();
 
         if (etag.Equals(GetETag()))
             return NotModified();

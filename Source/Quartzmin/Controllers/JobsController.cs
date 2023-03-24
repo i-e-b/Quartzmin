@@ -31,9 +31,9 @@ public class JobsController : PageControllerBase
                 Recovery = detail.RequestsRecovery,
                 JobName = key.Name,
                 Group = key.Group,
-                Type = detail.JobType.FullName,
+                Type = detail.JobType.FullName ?? detail.JobType.Name,
                 History = Histogram.Empty,
-                Description = detail.Description,
+                Description = detail.Description ?? ""
             };
             knownTypes.Add(detail.JobType.RemoveAssemblyDetails());
             list.Add(item);
@@ -54,7 +54,7 @@ public class JobsController : PageControllerBase
 
         job.GroupList = (await Scheduler.GetJobGroupNames()).GroupArray();
         job.Group = SchedulerConstants.DefaultGroup;
-        job.TypeList = Services.Cache.JobTypes ?? Array.Empty<string>();
+        job.TypeList = Services.Cache.JobTypes;
 
         return View("Edit", new JobViewModel { Job = job, DataMap = jobDataMap });
     }
@@ -114,7 +114,7 @@ public class JobsController : PageControllerBase
             Group = group,
             GroupList = (await Scheduler.GetJobGroupNames()).GroupArray(),
             Type = job.JobType.RemoveAssemblyDetails(),
-            TypeList = Services.Cache.JobTypes ?? Array.Empty<string>(),
+            TypeList = Services.Cache.JobTypes,
             Description = job.Description ?? "No Description",
             Recovery = job.RequestsRecovery
         };
@@ -142,6 +142,9 @@ public class JobsController : PageControllerBase
     {
         if (Request is null) return BadRequest()!;
         var jobModel = model.Job;
+        if (jobModel?.Type is null ||
+            jobModel.JobName is null) return BadRequest()!;
+        
         var jobDataMap = (await Request.GetJobDataMapForm()).GetModel(Services);
 
         var result = new ValidationResult();
@@ -157,7 +160,7 @@ public class JobsController : PageControllerBase
         IJobDetail BuildJob(JobBuilder builder) {
             return builder
                 .OfType(jobType)
-                .WithIdentity(jobModel.JobName, jobModel.Group)
+                .WithIdentity(jobModel.JobName, jobModel.Group!)
                 .WithDescription(jobModel.Description)
                 .SetJobData(jobDataMap.GetQuartzJobDataMap())
                 .RequestRecovery(jobModel.Recovery)
@@ -168,10 +171,14 @@ public class JobsController : PageControllerBase
         {
             await Scheduler.AddJob(BuildJob(JobBuilder.Create().StoreDurably()), replace: false);
         }
-        else
+        else if (jobModel.OldJobName is not null)
         {
             var oldJob = await GetJobDetail(JobKey.Create(jobModel.OldJobName, jobModel.OldGroup));
             await Scheduler.UpdateJob(oldJob.Key, BuildJob(oldJob.GetJobBuilder()));
+        }
+        else
+        {
+            return BadRequest()!;
         }
 
         if (trigger)

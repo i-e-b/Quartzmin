@@ -10,6 +10,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
+using JetBrains.Annotations;
 using Quartz.Plugins.RecentHistory;
 using HttpRequest = Microsoft.AspNetCore.Http.HttpRequest;
 
@@ -21,6 +22,29 @@ internal static class Extensions
     {
         if (store is null) return Task.FromResult<TO?>(default);
         return func(store)!;
+    }
+
+    public static List<T> ToListOrEmpty<T>(this IEnumerable<T>? src)
+    {
+        return src is null ? new List<T>() : src.ToList();
+    }
+
+    public static string MaybeReplace(this string? src, string? from, string? to)
+    {
+        if (src is null) return "";
+        return from is null ? src : src.Replace(from, to ?? "");
+    }
+
+    [ContractAnnotation("null=>true", true)]
+    public static bool IsNullOrEmpty(this string? str)
+    {
+        return str is null || string.IsNullOrEmpty(str);
+    }
+    
+    [ContractAnnotation("null=>true", true)]
+    public static bool IsNullOrWhiteSpace(this string? str)
+    {
+        return str is null || string.IsNullOrWhiteSpace(str);
     }
 
     public static TypeHandlerBase[] Order(this IEnumerable<TypeHandlerBase> typeHandlers)

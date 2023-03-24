@@ -1,12 +1,14 @@
-﻿using Quartzmin.TypeHandlers;
+﻿#nullable enable
+using System;
+using Quartzmin.TypeHandlers;
 
 namespace Quartzmin.Models;
 
 public class JobDataMapItem : JobDataMapItemBase
 {
-    public TypeHandlerBase[] SupportedTypes { get; set; }
+    public TypeHandlerBase[] SupportedTypes { get; set; } = Array.Empty<TypeHandlerBase>();
 
-    public string Description { get; set; }
+    public string Description { get; set; } = "";
 
     public bool Enabled { get; set; } = true;
 

@@ -456,7 +456,7 @@ public class TriggerPropertiesViewModel : IHasValidation
 
     public DateTime? GetEndTimeUtc() => ParseDateTime(EndTimeUtc);
 
-    public Dictionary<string, string> TimeZoneList { get => TimeZoneInfo.GetSystemTimeZones().ToDictionary(); }
+    public Dictionary<string, string?> TimeZoneList => TimeZoneInfo.GetSystemTimeZones().ToDictionary();
 
     private DateTime? ParseDateTime(string? value)
     {

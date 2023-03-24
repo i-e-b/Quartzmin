@@ -1,40 +1,36 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Web;
-
+﻿#nullable enable
 namespace Quartzmin.Models;
 
 public class TriggerListItem
 {
-    public string JobKey { get; set; }
+    public string JobKey { get; set; }="";
 
-    public string JobName { get; set; }
+    public string JobName { get; set; }="";
 
-    public string JobGroup { get; set; }
+    public string JobGroup { get; set; }="";
 
-    public string TriggerName { get; set; }
+    public string TriggerName { get; set; }="";
 
-    public string TriggerGroup { get; set; }
+    public string TriggerGroup { get; set; }="";
 
     public bool IsPaused { get; set; }
 
     public TriggerType Type { get; set; }
 
-    public string ClrType { get; set; }
+    public string ClrType { get; set; }="";
 
-    public string Description { get; set; }
+    public string Description { get; set; }="";
 
-    public string StartTime { get; set; }
-    public string EndTime { get; set; }
+    public string StartTime { get; set; }="";
+    public string? EndTime { get; set; }
 
 
-    public string LastFireTime { get; set; }
-    public string NextFireTime { get; set; }
+    public string? LastFireTime { get; set; }
+    public string? NextFireTime { get; set; }
 
-    public string ScheduleDescription { get; set; }
+    public string ScheduleDescription { get; set; } = "";
 
-    public Histogram History { get; set; }
+    public Histogram History { get; set; } = Histogram.Empty;
 
     public bool JobHeaderSeparator { get; set; }
 
@@ -42,31 +38,16 @@ public class TriggerListItem
     {
         get
         {
-            switch (Type)
+            return Type switch
             {
-                case TriggerType.Cron:
-                    return "clock outline";
-                case TriggerType.Simple:
-                    return "redo";
-                case TriggerType.Daily:
-                    return "tasks";
-                case TriggerType.Calendar:
-                    return "calendar alternate outline";
-                default:
-                    return "bug";
-            }
+                TriggerType.Cron => "clock outline",
+                TriggerType.Simple => "redo",
+                TriggerType.Daily => "tasks",
+                TriggerType.Calendar => "calendar alternate outline",
+                _ => "bug"
+            };
         }
     }
 
-    public string TypeString
-    {
-        get
-        {
-            if (Type == TriggerType.Unknown)
-                return ClrType;
-            else
-                return Type.ToString();
-        }
-    }
-
+    public string TypeString => Type == TriggerType.Unknown ? ClrType : Type.ToString() ?? "";
 }

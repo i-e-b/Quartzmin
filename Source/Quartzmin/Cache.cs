@@ -1,6 +1,8 @@
-﻿using Quartz;
+﻿#nullable enable
+using Quartz;
 using Quartz.Impl.Matchers;
 using System.Collections.Generic;
+
 using System.Linq;
 
 namespace Quartzmin;
@@ -13,29 +15,31 @@ internal class Cache
         _services = services;
     }
 
-    private string[] _jobTypes;
+    private string[]? _jobTypes;
     public string[] JobTypes
     {
         get
         {
-            if (_jobTypes == null)
+            if (_jobTypes != null) return _jobTypes;
+            lock (this)
             {
-                lock (this)
+                if (_jobTypes != null) return _jobTypes;
+                
+                var keys = _services.Scheduler.GetJobKeys(GroupMatcher<JobKey>.AnyGroup()).GetAwaiter().GetResult();
+                var knownTypes = new List<string>();
+                if (keys is not null)
                 {
-                    if (_jobTypes == null)
+                    foreach (var key in keys)
                     {
-                        var keys = _services.Scheduler.GetJobKeys(GroupMatcher<JobKey>.AnyGroup()).GetAwaiter().GetResult();
-                        var knownTypes = new List<string>();
-                        foreach (var key in keys)
-                        {
-                            var detail = _services.Scheduler.GetJobDetail(key).GetAwaiter().GetResult();
-                            knownTypes.Add(detail.JobType.RemoveAssemblyDetails());
-                        }
-                        UpdateJobTypes(knownTypes);
+                        var detail = _services.Scheduler.GetJobDetail(key).GetAwaiter().GetResult();
+                        if (detail is null) continue;
+                        knownTypes.Add(detail.JobType.RemoveAssemblyDetails());
                     }
                 }
+
+                UpdateJobTypes(knownTypes);
             }
-            return _jobTypes;
+            return _jobTypes!;
         }
     }
 

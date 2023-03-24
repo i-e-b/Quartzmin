@@ -1,4 +1,5 @@
-﻿using Quartzmin.Models;
+﻿#nullable enable
+using Quartzmin.Models;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -15,20 +16,21 @@ internal static class JobDataMapRequest
 
         foreach (var item in formData)
         {
+            if (item.Key is null) continue;
             var g = GetJobDataMapFieldGroup(item.Key);
             if (g != null)
             {
                 var field = item.Key.Substring(0, item.Key.Length - g.Length - 1);
                 if (!map.ContainsKey(g))
                     map[g] = new Dictionary<string, object>();
-                map[g][field] = item.Value;
+                map[g]![field] = item.Value;
             }
         }
 
         if (includeRowIndex)
         {
             foreach (var g in map.Keys)
-                map[g]["data-map[index]"] = g;
+                map[g]!["data-map[index]"] = g;
         }
 
         return Task.FromResult(map.Values.ToArray());
@@ -39,11 +41,10 @@ internal static class JobDataMapRequest
         return await GetJobDataMapForm(await request.GetFormData(), includeRowIndex);
     }
 
-    private static string GetJobDataMapFieldGroup(string field)
+    private static string? GetJobDataMapFieldGroup(string field)
     {
         var n = field.LastIndexOf(':');
-        if (n == -1)
-            return null;
+        if (n == -1) return null;
 
         return field.Substring(n + 1);
     }
@@ -52,12 +53,13 @@ internal static class JobDataMapRequest
     {
         var result = new List<KeyValuePair<string, object>>();
 
-        foreach (var key in request.Form.Keys)
+        var keys = request.Form?.Keys.ToListOrEmpty()!;
+        foreach (var key in keys)
         {
-            foreach (var strValue in request.Form[key])
+            foreach (var strValue in request.Form?[key].ToListOrEmpty()!)
                 result.Add(new KeyValuePair<string, object>(key, strValue));
         }
-        foreach (var file in request.Form.Files)
+        foreach (var file in request.Form?.Files.ToListOrEmpty()!)
             result.Add(new KeyValuePair<string, object>(file.Name, new FormFile(file)));
 
         return Task.FromResult(result);
