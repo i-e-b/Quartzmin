@@ -1,9 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;net452</TargetFrameworks>
     <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
-    <GeneratePackageOnBuild Condition="'$(Configuration)' == 'Release'">true</GeneratePackageOnBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>1591</NoWarn>
     <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
@@ -22,13 +20,9 @@
     <Copyright>Copyright © 2018 Jan Lucansky</Copyright>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/jlucansky/Quartzmin</RepositoryUrl>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(TargetFramework)', '^net\d'))">
-    <DefineConstants>NETFRAMEWORK</DefineConstants>
-    <AssemblySearchPaths>$(AssemblySearchPaths);{GAC}</AssemblySearchPaths>
-  </PropertyGroup>
-  <PropertyGroup Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(TargetFramework)', '^netstandard\d'))">
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>10</LangVersion>
+    <Nullable>enable</Nullable>
     <DefineConstants>NETSTANDARD</DefineConstants>
   </PropertyGroup>
 
@@ -41,16 +35,8 @@
     <PackageReference Include="JsonSubTypes" Version="1.5.1" />
     <PackageReference Include="Quartz" Version="3.0.7" />
   </ItemGroup>
-  
-  <ItemGroup Condition="$(DefineConstants.Contains('NETFRAMEWORK'))">
-    <Reference Include="System.Web" />
-    <Reference Include="System.ComponentModel.DataAnnotations" />
-    <PackageReference Include="Microsoft.AspNet.WebApi" Version="5.2.6" />
-    <PackageReference Include="Microsoft.AspNet.WebApi.Owin" Version="5.2.6" />
-    <PackageReference Include="Microsoft.Owin.StaticFiles" Version="2.1.0" />
-  </ItemGroup>
 
-  <ItemGroup Condition="$(DefineConstants.Contains('NETSTANDARD'))">
+  <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Core" Version="2.1.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.DataAnnotations" Version="2.1.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Formatters.Json" Version="2.1.0" />
