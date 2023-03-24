@@ -1,4 +1,5 @@
-﻿using Quartzmin.Helpers;
+﻿#nullable enable
+using Quartzmin.Helpers;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 

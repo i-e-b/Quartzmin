@@ -7,6 +7,7 @@ using Quartz.Impl.Matchers;
 using System;
 using System.Linq;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
@@ -23,9 +24,9 @@ public class SchedulerController : PageControllerBase
         var jobKeys = await Scheduler.GetJobKeys(GroupMatcher<JobKey>.AnyGroup());
         var triggerKeys = await Scheduler.GetTriggerKeys(GroupMatcher<TriggerKey>.AnyGroup());
         var currentlyExecutingJobs = await Scheduler.GetCurrentlyExecutingJobs();
-        IEnumerable<object> pausedJobGroups = null;
-        IEnumerable<object> pausedTriggerGroups = null;
-        IEnumerable<ExecutionHistoryEntry> execHistory = null;
+        IEnumerable<object>? pausedJobGroups = null;
+        IEnumerable<object>? pausedTriggerGroups = null;
+        IEnumerable<ExecutionHistoryEntry>? execHistory = null;
 
         try
         {
@@ -39,14 +40,14 @@ public class SchedulerController : PageControllerBase
         int? failedJobs = null;
         var executedJobs = metadata.NumberOfJobsExecuted;
             
-        if (histStore != null)
+        if (histStore is not null)
         {
-            execHistory = await histStore?.FilterLast(10);
-            executedJobs = await histStore?.GetTotalJobsExecuted();
-            failedJobs = await histStore?.GetTotalJobsFailed();
+            execHistory = await histStore.FilterLast(10);
+            executedJobs = await histStore.GetTotalJobsExecuted();
+            failedJobs = await histStore.GetTotalJobsFailed();
         }
 
-        var histogram = execHistory.ToHistogram(detailed: true) ?? Histogram.CreateEmpty();
+        var histogram = execHistory?.ToHistogram(detailed: true) ?? Histogram.CreateEmpty();
 
         histogram.BarWidth = 14;
 
@@ -73,16 +74,18 @@ public class SchedulerController : PageControllerBase
         var result = new List<object>();
 
         foreach (var name in groups.OrderBy(x => x, StringComparer.InvariantCultureIgnoreCase))
-            result.Add(new { Name = name, IsPaused = await func(name) });
+            result.Add(new { Name = name, IsPaused = await func(name)! });
 
         return result;
     }
 
+    [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
+    [SuppressMessage("ReSharper", "AutoPropertyCanBeMadeGetOnly.Global")]
     public class ActionArgs
     {
-        public string Action { get; set; }
-        public string Name { get; set; }
-        public string Groups { get; set; } // trigger-groups | job-groups
+        public string Action { get; set; } = "not supplied";
+        public string? Name { get; set; }
+        public string? Groups { get; set; } // trigger-groups | job-groups
     }
 
     [HttpPost, JsonErrorResponse]
@@ -100,7 +103,7 @@ public class SchedulerController : PageControllerBase
                 await Scheduler.Start();
                 break;
             case "pause":
-                if (string.IsNullOrEmpty(args.Name))
+                if (args.Name is null || string.IsNullOrEmpty(args.Name))
                 {
                     await Scheduler.PauseAll();
                 }
@@ -115,7 +118,7 @@ public class SchedulerController : PageControllerBase
                 }
                 break;
             case "resume":
-                if (string.IsNullOrEmpty(args.Name))
+                if (args.Name is null || string.IsNullOrEmpty(args.Name))
                 {
                     await Scheduler.ResumeAll();
                 }

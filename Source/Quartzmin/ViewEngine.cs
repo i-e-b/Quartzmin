@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 
@@ -14,44 +15,40 @@ public class ViewEngine
     public ViewEngine(Services services)
     {
         _services = services;
-        UseCache = string.IsNullOrEmpty(services.Options.ViewsRootDirectory);
+        UseCache = string.IsNullOrEmpty(services.Options.ViewsRootDirectory!);
     }
 
     private Func<object, string> GetRenderDelegate(string templatePath)
     {
-        if (UseCache)
+        if (!UseCache) return _services.Handlebars.CompileView(templatePath)!;
+        
+        lock (_compiledViews)
         {
-            lock (_compiledViews)
+            if (!_compiledViews.ContainsKey(templatePath) || _compiledViews[templatePath] is null)
             {
-                if (!_compiledViews.ContainsKey(templatePath))
-                {
-                    _compiledViews[templatePath] = _services.Handlebars.CompileView(templatePath);
-                }
-
-                return _compiledViews[templatePath];
+                _compiledViews[templatePath] = _services.Handlebars.CompileView(templatePath);
             }
+
+            return _compiledViews[templatePath]!;
         }
-        else
-        {
-            return _services.Handlebars.CompileView(templatePath);
-        }
+
     }
 
     public string Render(string templatePath, object model)
     {
-        return GetRenderDelegate(templatePath)(model);
+        return GetRenderDelegate(templatePath)(model) ?? "Fault in core render engine (render)";
     }
 
     public string Encode(object value)
     {
-        return _services.Handlebars.Configuration.TextEncoder.Encode(string.Format(CultureInfo.InvariantCulture, "{0}", value));
+        return _services.Handlebars.Configuration?.TextEncoder?.Encode(string.Format(CultureInfo.InvariantCulture, "{0}", value)) ?? "Fault in core render engine (encode)";
     }
 
     public string ErrorPage(Exception ex)
     {
         return Render("Error.hbs", new
         {
-            ex.GetBaseException().GetType().FullName,
+            ex.GetBaseException().GetType()?.FullName,
             Exception = ex,
             BaseException = ex.GetBaseException(),
             Dump = ex.ToString()

@@ -57,16 +57,12 @@ public static class ViewFileSystemFactory
     {
         public override string GetFileContent(string filename)
         {
-            using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(GetFullPath(filename)))
-            {
-                if (stream == null)
-                    return null;
+            using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(GetFullPath(filename));
+            if (stream == null)
+                return null;
 
-                using (var reader = new StreamReader(stream, Encoding.UTF8))
-                {
-                    return reader.ReadToEnd();
-                }
-            }
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+            return reader.ReadToEnd();
         }
 
         protected override string CombinePath(string dir, string otherFileName)

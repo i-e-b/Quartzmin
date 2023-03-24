@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿#nullable enable
+using Newtonsoft.Json;
 using Quartz;
 using Quartz.Impl.Matchers;
 using Quartz.Impl.Triggers;
@@ -10,14 +11,15 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 
+
 using static Quartz.MisfireInstruction;
 
 namespace Quartzmin.Models;
 
 public class TriggerViewModel : IHasValidation
 {
-    public TriggerPropertiesViewModel Trigger { get; set; }
-    public JobDataMapModel DataMap { get; set; }
+    public TriggerPropertiesViewModel? Trigger { get; set; }
+    public JobDataMapModel? DataMap { get; set; }
 
     public void Validate(ICollection<ValidationError> errors) => ModelValidator.ValidateObject(this, errors);
 }
@@ -25,8 +27,8 @@ public class TriggerViewModel : IHasValidation
 public class CronTriggerViewModel : IHasValidation
 {
     [Required]
-    public string Expression { get; set; }
-    public string TimeZone { get; set; }
+    public string? Expression { get; set; }
+    public string? TimeZone { get; set; }
 
     public void Validate(ICollection<ValidationError> errors)
     {
@@ -44,10 +46,11 @@ public class CronTriggerViewModel : IHasValidation
 
     public void Apply(TriggerBuilder builder, TriggerPropertiesViewModel model)
     {
+        if (Expression is null) throw new Exception("Tried to Apply a null Expression");
         builder.WithCronSchedule(Expression, x =>
         {
-            if (!string.IsNullOrEmpty(TimeZone))
-                x.InTimeZone(TimeZoneInfo.FindSystemTimeZoneById(TimeZone));
+            if (TimeZone is not null && !string.IsNullOrEmpty(TimeZone))
+                x.InTimeZone(TimeZoneInfo.FindSystemTimeZoneById(TimeZone) ?? TimeZoneInfo.Utc);
 
             switch (model.MisfireInstruction)
             {
@@ -128,21 +131,19 @@ public class SimpleTriggerViewModel : IHasValidation
 
     private TimeSpan GetRepeatIntervalTimeSpan()
     {
-        switch (RepeatUnit)
+        if (RepeatInterval is null) throw new ArgumentException("Invalid value: " + RepeatUnit, nameof(RepeatUnit));
+        return RepeatUnit switch
         {
-            case IntervalUnit.Millisecond:
-                return TimeSpan.FromMilliseconds(RepeatInterval.Value);
-            case IntervalUnit.Second:
-                return TimeSpan.FromSeconds(RepeatInterval.Value);
-            case IntervalUnit.Minute:
-                return TimeSpan.FromMinutes(RepeatInterval.Value);
-            case IntervalUnit.Hour:
-                return TimeSpan.FromHours(RepeatInterval.Value);
-            case IntervalUnit.Day:
-                return TimeSpan.FromDays(RepeatInterval.Value);
-            default:
-                throw new ArgumentException("Invalid value: " + RepeatUnit, nameof(RepeatUnit));
-        }
+            IntervalUnit.Millisecond => TimeSpan.FromMilliseconds(RepeatInterval.Value),
+            IntervalUnit.Second => TimeSpan.FromSeconds(RepeatInterval.Value),
+            IntervalUnit.Minute => TimeSpan.FromMinutes(RepeatInterval.Value),
+            IntervalUnit.Hour => TimeSpan.FromHours(RepeatInterval.Value),
+            IntervalUnit.Day => TimeSpan.FromDays(RepeatInterval.Value),
+            IntervalUnit.Week => TimeSpan.FromDays(7 * RepeatInterval.Value),
+            IntervalUnit.Month => TimeSpan.FromDays(30.5 * RepeatInterval.Value),
+            IntervalUnit.Year => TimeSpan.FromDays(365.2425 * RepeatInterval.Value),
+            _ => throw new ArgumentException("Invalid value: " + RepeatUnit, nameof(RepeatUnit))
+        };
     }
 
     public void Apply(TriggerBuilder builder, TriggerPropertiesViewModel model)
@@ -151,10 +152,9 @@ public class SimpleTriggerViewModel : IHasValidation
         {
             x.WithInterval(GetRepeatIntervalTimeSpan());
 
-            if (RepeatForever)
-                x.RepeatForever();
-            else
-                x.WithRepeatCount(RepeatCount.Value);
+            if (RepeatForever) x.RepeatForever();
+            else if (RepeatCount is null) throw new Exception("Tried to apply a trigger with an invalid repeat count");
+            else x.WithRepeatCount(RepeatCount.Value);
 
             switch (model.MisfireInstruction)
             {
@@ -203,7 +203,7 @@ public class DailyTriggerViewModel : IHasValidation
     [Required]
     public TimeSpan? EndTime { get; set; }
 
-    public string TimeZone { get; set; }
+    public string? TimeZone { get; set; }
 
     public void Validate(ICollection<ValidationError> errors)
     {
@@ -239,12 +239,19 @@ public class DailyTriggerViewModel : IHasValidation
     {
         builder.WithDailyTimeIntervalSchedule(x =>
         {
-            if (!string.IsNullOrEmpty(TimeZone))
-                x.InTimeZone(TimeZoneInfo.FindSystemTimeZoneById(TimeZone));
+            if (TimeZone is not null && !string.IsNullOrEmpty(TimeZone))
+                x.InTimeZone(TimeZoneInfo.FindSystemTimeZoneById(TimeZone) ?? TimeZoneInfo.Utc);
 
             if (!RepeatForever)
+            {
+                if (RepeatCount is null) throw new Exception("Tried to apply a trigger with an invalid repeat count");
                 x.WithRepeatCount(RepeatCount.Value);
+            }
 
+            if (RepeatInterval is null) throw new Exception("Tried to apply a trigger with an invalid repeat interval");
+            if (StartTime is null) throw new Exception("Tried to apply a trigger with an invalid start time");
+            if (EndTime is null) throw new Exception("Tried to apply a trigger with an invalid end time");
+            
             x.WithInterval(RepeatInterval.Value, RepeatUnit);
             x.StartingDailyAt(StartTime.Value.ToTimeOfDay());
             x.EndingDailyAt(EndTime.Value.ToTimeOfDay());
@@ -280,7 +287,7 @@ public class CalendarTriggerViewModel : IHasValidation
     [Required]
     public IntervalUnit RepeatUnit { get; set; }
 
-    public string TimeZone { get; set; }
+    public string? TimeZone { get; set; }
 
     public bool PreserveHourAcrossDst { get; set; }
 
@@ -307,9 +314,12 @@ public class CalendarTriggerViewModel : IHasValidation
     {
         builder.WithCalendarIntervalSchedule(x =>
         {
-            if (!string.IsNullOrEmpty(TimeZone))
+            if (TimeZone is not null && !string.IsNullOrEmpty(TimeZone))
                 x.InTimeZone(TimeZoneInfo.FindSystemTimeZoneById(TimeZone));
 
+            
+            if (RepeatInterval is null) throw new Exception("Tried to apply a trigger with an invalid repeat interval");
+            
             x.WithInterval(RepeatInterval.Value, RepeatUnit);
             x.PreserveHourOfDayAcrossDaylightSavings(PreserveHourAcrossDst);
             x.SkipDayIfHourDoesNotExist(SkipDayIfHourDoesNotExist);
@@ -421,26 +431,26 @@ public class TriggerPropertiesViewModel : IHasValidation
     public TriggerType Type { get; set; }
 
     [Required]
-    public string Job { get; set; }
+    public string? Job { get; set; }
 
-    public IEnumerable<string> JobList { get; set; }
-
-    [Required]
-    public string TriggerName { get; set; }
+    public IEnumerable<string> JobList { get; set; } = Array.Empty<string>();
 
     [Required]
-    public string TriggerGroup { get; set; }
+    public string? TriggerName { get; set; }
 
-    public string OldTriggerName { get; set; }
+    [Required]
+    public string? TriggerGroup { get; set; }
 
-    public string OldTriggerGroup { get; set; }
+    public string? OldTriggerName { get; set; }
 
-    public IEnumerable<string> TriggerGroupList { get; set; }
+    public string? OldTriggerGroup { get; set; }
 
-    public string Description { get; set; }
+    public IEnumerable<string> TriggerGroupList { get; set; } = Array.Empty<string>();
 
-    public string StartTimeUtc { get; set; }
-    public string EndTimeUtc { get; set; }
+    public string? Description { get; set; }
+
+    public string? StartTimeUtc { get; set; }
+    public string? EndTimeUtc { get; set; }
 
     public DateTime? GetStartTimeUtc() => ParseDateTime(StartTimeUtc);
 
@@ -448,20 +458,17 @@ public class TriggerPropertiesViewModel : IHasValidation
 
     public Dictionary<string, string> TimeZoneList { get => TimeZoneInfo.GetSystemTimeZones().ToDictionary(); }
 
-    private DateTime? ParseDateTime(string value)
+    private DateTime? ParseDateTime(string? value)
     {
-        if (string.IsNullOrEmpty(value))
-            return null;
-
-        if (DateTime.TryParseExact(value, DateTimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var result) == false)
-            return null;
+        if (value is null || string.IsNullOrEmpty(value)) return null;
+        if (DateTime.TryParseExact(value, DateTimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var result) == false) return null;
 
         return result;
     }
 
-    public string CalendarName { get; set; }
+    public string? CalendarName { get; set; }
 
-    public IEnumerable<string> CalendarNameList { get; set; }
+    public IEnumerable<string> CalendarNameList { get; set; } = Array.Empty<string>();
 
     [Required]
     public int? Priority { get; set; }

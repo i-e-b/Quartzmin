@@ -1,10 +1,10 @@
 ﻿#nullable enable
 using System;
+using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
-using System.Globalization;
 
-namespace CronExpressionDescriptor;
+namespace Quartzmin.CronExpressionDescriptor;
 
 /// <summary>
 /// Cron Expression Parser
@@ -25,9 +25,9 @@ public class ExpressionParser
 
      */
 
-    private string m_expression;
-    private Options m_options;
-    private CultureInfo m_en_culture;
+    private readonly string _expression;
+    private readonly Options _options;
+    private readonly CultureInfo _enCulture;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ExpressionParser"/> class
@@ -36,9 +36,9 @@ public class ExpressionParser
     /// <param name="options">Parsing options</param>
     public ExpressionParser(string expression, Options options)
     {
-        m_expression = expression;
-        m_options = options;
-        m_en_culture = new CultureInfo("en-US"); //Default to English
+        _expression = expression;
+        _options = options;
+        _enCulture = new CultureInfo("en-US"); //Default to English
     }
 
     /// <summary>
@@ -48,30 +48,24 @@ public class ExpressionParser
     public string[] Parse()
     {
         // Initialize all elements of parsed array to empty strings
-        string[] parsed = new string[7].Select(el => "").ToArray();
+        var parsed = new string[7].Select(_ => "").ToArray();
 
-        if (string.IsNullOrEmpty(m_expression))
+        if (string.IsNullOrEmpty(_expression))
         {
-#if NET_STANDARD_1X
-                throw new Exception("Field 'expression' not found.");
-#else
             throw new MissingFieldException("Field 'expression' not found.");
-#endif
         }
-        else
-        {
-            string[] expressionPartsTemp = m_expression.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
 
-            if (expressionPartsTemp.Length < 5)
-            {
-                throw new FormatException(string.Format("Error: Expression only has {0} parts.  At least 5 part are required.", expressionPartsTemp.Length));
-            }
-            else if (expressionPartsTemp.Length == 5)
-            {
+        var expressionPartsTemp = _expression.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+
+        switch (expressionPartsTemp.Length)
+        {
+            case < 5:
+                throw new FormatException($"Error: Expression only has {expressionPartsTemp.Length} parts.  At least 5 part are required.");
+            case 5:
                 //5 part cron so shift array past seconds element
                 Array.Copy(expressionPartsTemp, 0, parsed, 1, 5);
-            }
-            else if (expressionPartsTemp.Length == 6)
+                break;
+            case 6:
             {
                 //If last element ends with 4 digits, a year element has been supplied and no seconds element
                 var yearRegex = new Regex("\\d{4}$");
@@ -83,15 +77,14 @@ public class ExpressionParser
                 {
                     Array.Copy(expressionPartsTemp, 0, parsed, 0, 6);
                 }
+
+                break;
             }
-            else if (expressionPartsTemp.Length == 7)
-            {
+            case 7:
                 parsed = expressionPartsTemp;
-            }
-            else
-            {
-                throw new FormatException(string.Format("Error: Expression has too many parts ({0}).  Expression must not have more than 7 parts.", expressionPartsTemp.Length));
-            }
+                break;
+            default:
+                throw new FormatException($"Error: Expression has too many parts ({expressionPartsTemp.Length}).  Expression must not have more than 7 parts.");
         }
 
         NormalizeExpression(parsed);
@@ -153,7 +146,7 @@ public class ExpressionParser
         }
 
         // Handle DayOfWeekStartIndexZero option where SUN=1 rather than SUN=0
-        if (!m_options.DayOfWeekStartIndexZero)
+        if (!_options.DayOfWeekStartIndexZero)
         {
             expressionParts[5] = DecreaseDaysOfWeek(expressionParts[5]);
         }
@@ -168,7 +161,7 @@ public class ExpressionParser
         for (var i = 0; i <= 6; i++)
         {
             var currentDay = (DayOfWeek)i;
-            var currentDayOfWeekDescription = currentDay.ToString().Substring(0, 3).ToUpperInvariant();
+            var currentDayOfWeekDescription = currentDay.ToString()?.Substring(0, 3).ToUpperInvariant() ?? "?";
             expressionParts[5] = Regex.Replace(expressionParts[5], currentDayOfWeekDescription, i.ToString(), RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
         }
@@ -177,7 +170,7 @@ public class ExpressionParser
         for (var i = 1; i <= 12; i++)
         {
             var currentMonth = new DateTime(DateTime.Now.Year, i, 1);
-            var currentMonthDescription = currentMonth.ToString("MMM", m_en_culture).ToUpperInvariant();
+            var currentMonthDescription = currentMonth.ToString("MMM", _enCulture).ToUpperInvariant();
             expressionParts[4] = Regex.Replace(expressionParts[4], currentMonthDescription, i.ToString(), RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         }
 
@@ -204,24 +197,19 @@ public class ExpressionParser
                 - DOW part '3/2' will be converted to '3-6/2' (every 2 days between Tuesday and Saturday)
             */
 
-            if (expressionParts[i].Contains("/")
-                && expressionParts[i].IndexOfAny(new char[] { '*', '-', ',' }) == -1)
+            if (!expressionParts[i].Contains("/") || expressionParts[i].IndexOfAny(new[] { '*', '-', ',' }) != -1) continue;
+            var stepRangeThrough = i switch
             {
-                string stepRangeThrough = null;
-                switch (i)
-                {
-                    case 4: stepRangeThrough = "12"; break;
-                    case 5: stepRangeThrough = "6"; break;
-                    case 6: stepRangeThrough = "9999"; break;
-                    default: stepRangeThrough = null; break;
-                }
+                4 => "12",
+                5 => "6",
+                6 => "9999",
+                _ => null
+            };
 
-                if (stepRangeThrough != null)
-                {
-                    string[] parts = expressionParts[i].Split('/');
-                    expressionParts[i] = string.Format("{0}-{1}/{2}", parts[0], stepRangeThrough, parts[1]);
-                }
-            }
+            if (stepRangeThrough == null) continue;
+            
+            var parts = expressionParts[i].Split('/');
+            expressionParts[i] = $"{parts[0]}-{stepRangeThrough}/{parts[1]}";
         }
     }
 
@@ -230,9 +218,8 @@ public class ExpressionParser
         var dowChars = dayOfWeekExpressionPart.ToCharArray();
         for (var i = 0; i < dowChars.Length; i++)
         {
-            int charNumeric;
             if ((i == 0 || dowChars[i - 1] != '#' && dowChars[i - 1] != '/')
-                && int.TryParse(dowChars[i].ToString(), out charNumeric))
+                && int.TryParse(dowChars[i].ToString(), out var charNumeric))
             {
                 dowChars[i] = (charNumeric - 1).ToString()[0];
             }

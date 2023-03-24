@@ -48,14 +48,12 @@ public class TriggersController : PageControllerBase
         ViewBag.Groups = (await Scheduler.GetTriggerGroupNames()).GroupArray();
 
         list = list.OrderBy(x => x.JobKey).ToList();
-        string prevKey = null;
+        string? prevKey = null;
         foreach (var item in list)
         {
-            if (item.JobKey != prevKey)
-            {
-                item.JobHeaderSeparator = true;
-                prevKey = item.JobKey;
-            }
+            if (item.JobKey == prevKey) continue;
+            item.JobHeaderSeparator = true;
+            prevKey = item.JobKey;
         }
 
         return View(list);
@@ -78,7 +76,7 @@ public class TriggersController : PageControllerBase
     [HttpGet]
     public async Task<IActionResult> Edit(string name, string group, bool clone = false)
     {
-        if (!EnsureValidKey(name, group)) return BadRequest();
+        if (!EnsureValidKey(name, group)) return BadRequest()!;
 
         var key = new TriggerKey(name, group);
         var trigger = await GetTrigger(key);
@@ -99,7 +97,7 @@ public class TriggersController : PageControllerBase
         if (clone)
             model.TriggerName += " - Copy";
 
-        // don't show start time in the past because rescheduling cause triggering missfire policies
+        // don't show start time in the past because rescheduling cause triggering mis-fire policies
         model.StartTimeUtc = trigger.StartTimeUtc > DateTimeOffset.UtcNow ? trigger.StartTimeUtc.UtcDateTime.ToDefaultFormat() : null;
 
         model.EndTimeUtc = trigger.EndTimeUtc?.UtcDateTime.ToDefaultFormat();
@@ -136,6 +134,7 @@ public class TriggersController : PageControllerBase
     [HttpPost, JsonErrorResponse]
     public async Task<IActionResult> Save([FromForm] TriggerViewModel model)
     {
+        if (Request is null) return BadRequest()!;
         var triggerModel = model.Trigger;
         var jobDataMap = (await Request.GetJobDataMapForm()).GetModel(Services);
             
@@ -144,40 +143,43 @@ public class TriggersController : PageControllerBase
         model.Validate(result.Errors);
         ModelValidator.Validate(jobDataMap, result.Errors);
 
-        if (result.Success)
+        if (!result.Success) return Json(result);
+        if (triggerModel?.TriggerName is null ||
+            triggerModel.TriggerGroup is null ||
+            triggerModel.Job is null) return BadRequest()!;
+        
+        var builder = TriggerBuilder.Create()
+            .WithIdentity(new TriggerKey(triggerModel.TriggerName, triggerModel.TriggerGroup))
+            .ForJob(jobKey: triggerModel.Job)
+            .UsingJobData(jobDataMap.GetQuartzJobDataMap())
+            .WithDescription(triggerModel.Description)
+            .WithPriority(triggerModel.PriorityOrDefault);
+
+        builder.StartAt(triggerModel.GetStartTimeUtc() ?? DateTime.UtcNow);
+        builder.EndAt(triggerModel.GetEndTimeUtc());
+
+        if (!string.IsNullOrEmpty(triggerModel.CalendarName!))
+            builder.ModifiedByCalendar(triggerModel.CalendarName);
+
+        if (triggerModel.Type == TriggerType.Cron)
+            triggerModel.Cron.Apply(builder, triggerModel);
+        if (triggerModel.Type == TriggerType.Simple)
+            triggerModel.Simple.Apply(builder, triggerModel);
+        if (triggerModel.Type == TriggerType.Daily)
+            triggerModel.Daily.Apply(builder, triggerModel);
+        if (triggerModel.Type == TriggerType.Calendar)
+            triggerModel.Calendar.Apply(builder, triggerModel);
+
+        var trigger = builder.Build();
+
+        if (triggerModel.IsNew)
         {
-            var builder = TriggerBuilder.Create()
-                .WithIdentity(new TriggerKey(triggerModel.TriggerName, triggerModel.TriggerGroup))
-                .ForJob(jobKey: triggerModel.Job)
-                .UsingJobData(jobDataMap.GetQuartzJobDataMap())
-                .WithDescription(triggerModel.Description)
-                .WithPriority(triggerModel.PriorityOrDefault);
-
-            builder.StartAt(triggerModel.GetStartTimeUtc() ?? DateTime.UtcNow);
-            builder.EndAt(triggerModel.GetEndTimeUtc());
-
-            if (!string.IsNullOrEmpty(triggerModel.CalendarName))
-                builder.ModifiedByCalendar(triggerModel.CalendarName);
-
-            if (triggerModel.Type == TriggerType.Cron)
-                triggerModel.Cron.Apply(builder, triggerModel);
-            if (triggerModel.Type == TriggerType.Simple)
-                triggerModel.Simple.Apply(builder, triggerModel);
-            if (triggerModel.Type == TriggerType.Daily)
-                triggerModel.Daily.Apply(builder, triggerModel);
-            if (triggerModel.Type == TriggerType.Calendar)
-                triggerModel.Calendar.Apply(builder, triggerModel);
-
-            var trigger = builder.Build();
-
-            if (triggerModel.IsNew)
-            {
-                await Scheduler.ScheduleJob(trigger);
-            }
-            else
-            {
-                await Scheduler.RescheduleJob(new TriggerKey(triggerModel.OldTriggerName, triggerModel.OldTriggerGroup), trigger);
-            }
+            await Scheduler.ScheduleJob(trigger);
+        }
+        else
+        {
+            if (triggerModel.OldTriggerName is null || triggerModel.OldTriggerGroup is null) throw new Exception("Could not reschedule job: invalid keys");
+            await Scheduler.RescheduleJob(new TriggerKey(triggerModel.OldTriggerName, triggerModel.OldTriggerGroup), trigger);
         }
 
         return Json(result);
@@ -186,54 +188,53 @@ public class TriggersController : PageControllerBase
     [HttpPost, JsonErrorResponse]
     public async Task<IActionResult> Delete([FromBody] KeyModel model)
     {
-        if (!EnsureValidKey(model)) return BadRequest();
+        if (!EnsureValidKey(model)) return BadRequest()!;
 
         var key = model.ToTriggerKey();
 
         if (!await Scheduler.UnscheduleJob(key))
-            throw new InvalidOperationException("Cannot unschedule job " + key);
+            throw new InvalidOperationException("Cannot remove job from schedule: " + key);
 
-        return NoContent();
+        return NoContent()!;
     }
 
     [HttpPost, JsonErrorResponse]
     public async Task<IActionResult> Resume([FromBody] KeyModel model)
     {
-        if (!EnsureValidKey(model)) return BadRequest();
+        if (!EnsureValidKey(model)) return BadRequest()!;
         await Scheduler.ResumeTrigger(model.ToTriggerKey());
-        return NoContent();
+        return NoContent()!;
     }
 
     [HttpPost, JsonErrorResponse]
     public async Task<IActionResult> Pause([FromBody] KeyModel model)
     {
-        if (!EnsureValidKey(model)) return BadRequest();
+        if (!EnsureValidKey(model)) return BadRequest()!;
         await Scheduler.PauseTrigger(model.ToTriggerKey());
-        return NoContent();
+        return NoContent()!;
     }
 
     [HttpPost, JsonErrorResponse]
     public async Task<IActionResult> PauseJob([FromBody] KeyModel model)
     {
-        if (!EnsureValidKey(model)) return BadRequest();
+        if (!EnsureValidKey(model)) return BadRequest()!;
         await Scheduler.PauseJob(model.ToJobKey());
-        return NoContent();
+        return NoContent()!;
     }
 
     [HttpPost, JsonErrorResponse]
     public async Task<IActionResult> ResumeJob([FromBody] KeyModel model)
     {
-        if (!EnsureValidKey(model)) return BadRequest();
+        if (!EnsureValidKey(model)) return BadRequest()!;
         await Scheduler.ResumeJob(model.ToJobKey());
-        return NoContent();
+        return NoContent()!;
     }
 
     [HttpPost, JsonErrorResponse]
     public IActionResult Cron()
     {
-        var cron = Request.ReadAsString()?.Trim();
-        if (string.IsNullOrEmpty(cron))
-            return Json(new { Description = "", Next = new object[0] });
+        var cron = (Request?.ReadAsString())?.Trim();
+        if (cron is null || string.IsNullOrEmpty(cron)) return Json(new { Description = "", Next = Array.Empty<object>() });
 
         var desc = "Invalid format.";
 
@@ -241,10 +242,9 @@ public class TriggersController : PageControllerBase
         {
             desc = CronExpressionDescriptor.ExpressionDescriptor.GetDescription(cron);
         }
-        catch
-        { }
+        catch {/* ignore */ }
 
-        List<string> nextDates = new List<string>();
+        var nextDates = new List<string>();
 
         try
         {
@@ -259,8 +259,7 @@ public class TriggersController : PageControllerBase
                 dt = next.Value.LocalDateTime;
             }
         }
-        catch
-        { }
+        catch {/* ignore */ }
 
         return Json(new { Description = desc, Next = nextDates });
     }
@@ -279,8 +278,8 @@ public class TriggersController : PageControllerBase
     public async Task<IActionResult> AdditionalData()
     {
         var keys = await Scheduler.GetTriggerKeys(GroupMatcher<TriggerKey>.AnyGroup());
-        var history = await Scheduler.Context.GetExecutionHistoryStore().FilterLastOfEveryTrigger(10);
-        var historyByTrigger = history.ToLookup(x => x.Trigger);
+        var history = await Scheduler.Context.GetExecutionHistoryStore().Maybe(s=>s.FilterLastOfEveryTrigger(10));
+        var historyByTrigger = history?.ToLookup(x => x.Trigger);
 
         var list = new List<object>();
         foreach (var key in keys)
@@ -289,7 +288,7 @@ public class TriggersController : PageControllerBase
             {
                 TriggerName = key.Name,
                 TriggerGroup = key.Group,
-                History = historyByTrigger.TryGet(key.ToString()).ToHistogram(),
+                History = historyByTrigger?.TryGet(key.ToString()).ToHistogram(),
             });
         }
 
@@ -303,7 +302,7 @@ public class TriggersController : PageControllerBase
         return Edit(name, group, clone: true);
     }
 
-    private bool EnsureValidKey(string name, string group) => !(string.IsNullOrEmpty(name) || string.IsNullOrEmpty(group));
+    private bool EnsureValidKey(string? name, string? group) => !(string.IsNullOrEmpty(name!) || string.IsNullOrEmpty(group!));
     private bool EnsureValidKey(KeyModel model) => EnsureValidKey(model.Name, model.Group);
 
 }

@@ -1,8 +1,7 @@
-﻿using Quartz;
+﻿#nullable enable
+using Quartz;
 using Quartzmin.TypeHandlers;
 using System.Collections.Generic;
-using System.IO;
-
 using Number = Quartzmin.TypeHandlers.NumberHandler.UnderlyingType;
 
 namespace Quartzmin;
@@ -47,6 +46,7 @@ public class QuartzminOptions
     public QuartzminOptions()
     {
         DefaultSelectedType = new StringHandler { Name = "String" };
+        Scheduler = new DummyScheduler();
 
         // order of StandardTypes is important due to TypeHandlerBase.CanHandle evaluation
         StandardTypes.Add(new FileHandler { Name = "File", DisplayName = "Binary Data" });
@@ -63,15 +63,6 @@ public class QuartzminOptions
         StandardTypes.Add(new StringHandler { Name = "MultilineString", DisplayName = "String (Multiline)", IsMultiline = true });
     }
 
-#if DEBUG
-    public string SitePhysicalDirectory { get; set; }
-
-    internal string ContentRootDirectory => 
-        string.IsNullOrEmpty(SitePhysicalDirectory) ? null : Path.Combine(SitePhysicalDirectory, "Content");
-    internal string ViewsRootDirectory => 
-        string.IsNullOrEmpty(SitePhysicalDirectory) ? null : Path.Combine(SitePhysicalDirectory, "Views");
-#else
-        internal string ContentRootDirectory => null;
-        internal string ViewsRootDirectory => null;
-#endif
+    internal string? ContentRootDirectory => null;
+    internal string? ViewsRootDirectory => null;
 }

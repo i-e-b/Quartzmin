@@ -1,14 +1,11 @@
 #nullable enable
 using System;
-using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
-using System.Threading;
 using System.Text.RegularExpressions;
-using System.Resources;
-using System.Globalization;
 
-namespace CronExpressionDescriptor;
+namespace Quartzmin.CronExpressionDescriptor;
 
 /// <summary>
 /// Converts a Cron Expression into a human readable string
@@ -743,7 +740,7 @@ public class ExpressionDescriptor
   /// </summary>
   /// <param name="expression">The cron expression string</param>
   /// <returns>The cron expression description</returns>
-  public static string GetDescription(string expression)
+  public static string GetDescription(string? expression)
   {
     return GetDescription(expression, new Options());
   }
@@ -754,10 +751,11 @@ public class ExpressionDescriptor
   /// <param name="expression">The cron expression string</param>
   /// <param name="options">Options to control the output description</param>
   /// <returns>The cron expression description</returns>
-  public static string GetDescription(string expression, Options options)
+  public static string GetDescription(string? expression, Options options)
   {
-    var descripter = new ExpressionDescriptor(expression, options);
-    return descripter.GetDescription(DescriptionTypeEnum.FULL);
+    if (expression is null) return "invalid";
+    var descriptor = new ExpressionDescriptor(expression, options);
+    return descriptor.GetDescription(DescriptionTypeEnum.FULL);
   }
   #endregion
 }

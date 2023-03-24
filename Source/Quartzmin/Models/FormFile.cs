@@ -11,10 +11,8 @@ public class FormFile
 
     public byte[] GetBytes()
     {
-        using (var stream = new MemoryStream())
-        {
-            GetStream().CopyTo(stream);
-            return stream.ToArray();
-        }
+        using var stream = new MemoryStream();
+        GetStream().CopyTo(stream);
+        return stream.ToArray();
     }
 }

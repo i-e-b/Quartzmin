@@ -54,7 +54,7 @@ public class JobsController : PageControllerBase
 
         job.GroupList = (await Scheduler.GetJobGroupNames()).GroupArray();
         job.Group = SchedulerConstants.DefaultGroup;
-        job.TypeList = Services.Cache.JobTypes;
+        job.TypeList = Services.Cache.JobTypes ?? Array.Empty<string>();
 
         return View("Edit", new JobViewModel { Job = job, DataMap = jobDataMap });
     }
@@ -62,7 +62,7 @@ public class JobsController : PageControllerBase
     [HttpGet]
     public async Task<IActionResult> Trigger(string name, string group)
     {
-        if (!EnsureValidKey(name, group)) return BadRequest();
+        if (!EnsureValidKey(name, group)) return BadRequest()!;
 
         var jobKey = JobKey.Create(name, group);
         var job = await GetJobDetail(jobKey);
@@ -79,7 +79,8 @@ public class JobsController : PageControllerBase
     [HttpPost, ActionName("Trigger"), JsonErrorResponse]
     public async Task<IActionResult> PostTrigger(string name, string group)
     {
-        if (!EnsureValidKey(name, group)) return BadRequest();
+        if (Request is null) return BadRequest()!;
+        if (!EnsureValidKey(name, group)) return BadRequest()!;
 
         var jobDataMap = (await Request.GetJobDataMapForm()).GetModel(Services);
 
@@ -98,25 +99,25 @@ public class JobsController : PageControllerBase
     [HttpGet]
     public async Task<IActionResult> Edit(string name, string group, bool clone = false)
     {
-        if (!EnsureValidKey(name, group)) return BadRequest();
+        if (!EnsureValidKey(name, group)) return BadRequest()!;
 
         var jobKey = JobKey.Create(name, group);
         var job = await GetJobDetail(jobKey);
 
-        var jobModel = new JobPropertiesViewModel { };
         var jobDataMap = new JobDataMapModel { Template = JobDataMapItemTemplate };
 
-        jobModel.IsNew = clone;
-        jobModel.IsCopy = clone;
-        jobModel.JobName = name;
-        jobModel.Group = group;
-        jobModel.GroupList = (await Scheduler.GetJobGroupNames()).GroupArray();
-
-        jobModel.Type = job.JobType.RemoveAssemblyDetails();
-        jobModel.TypeList = Services.Cache.JobTypes;
-
-        jobModel.Description = job.Description;
-        jobModel.Recovery = job.RequestsRecovery;
+        var jobModel = new JobPropertiesViewModel
+        {
+            IsNew = clone,
+            IsCopy = clone,
+            JobName = name,
+            Group = group,
+            GroupList = (await Scheduler.GetJobGroupNames()).GroupArray(),
+            Type = job.JobType.RemoveAssemblyDetails(),
+            TypeList = Services.Cache.JobTypes ?? Array.Empty<string>(),
+            Description = job.Description ?? "No Description",
+            Recovery = job.RequestsRecovery
+        };
 
         if (clone)
             jobModel.JobName += " - Copy";
@@ -139,6 +140,7 @@ public class JobsController : PageControllerBase
     [HttpPost, JsonErrorResponse]
     public async Task<IActionResult> Save([FromForm] JobViewModel model, bool trigger)
     {
+        if (Request is null) return BadRequest()!;
         var jobModel = model.Job;
         var jobDataMap = (await Request.GetJobDataMapForm()).GetModel(Services);
 
@@ -147,33 +149,34 @@ public class JobsController : PageControllerBase
         model.Validate(result.Errors);
         ModelValidator.Validate(jobDataMap, result.Errors);
 
-        if (result.Success)
+        if (!result.Success) return Json(result);
+        
+        var jobType = Type.GetType(jobModel.Type, true);
+        if (jobType is null) return BadRequest()!;
+
+        IJobDetail BuildJob(JobBuilder builder) {
+            return builder
+                .OfType(jobType)
+                .WithIdentity(jobModel.JobName, jobModel.Group)
+                .WithDescription(jobModel.Description)
+                .SetJobData(jobDataMap.GetQuartzJobDataMap())
+                .RequestRecovery(jobModel.Recovery)
+                .Build();
+        }
+
+        if (jobModel.IsNew)
         {
-            IJobDetail BuildJob(JobBuilder builder)
-            {
-                return builder
-                    .OfType(Type.GetType(jobModel.Type, true))
-                    .WithIdentity(jobModel.JobName, jobModel.Group)
-                    .WithDescription(jobModel.Description)
-                    .SetJobData(jobDataMap.GetQuartzJobDataMap())
-                    .RequestRecovery(jobModel.Recovery)
-                    .Build();
-            }
+            await Scheduler.AddJob(BuildJob(JobBuilder.Create().StoreDurably()), replace: false);
+        }
+        else
+        {
+            var oldJob = await GetJobDetail(JobKey.Create(jobModel.OldJobName, jobModel.OldGroup));
+            await Scheduler.UpdateJob(oldJob.Key, BuildJob(oldJob.GetJobBuilder()));
+        }
 
-            if (jobModel.IsNew)
-            {
-                await Scheduler.AddJob(BuildJob(JobBuilder.Create().StoreDurably()), replace: false);
-            }
-            else
-            {
-                var oldJob = await GetJobDetail(JobKey.Create(jobModel.OldJobName, jobModel.OldGroup));
-                await Scheduler.UpdateJob(oldJob.Key, BuildJob(oldJob.GetJobBuilder()));
-            }
-
-            if (trigger)
-            {
-                await Scheduler.TriggerJob(JobKey.Create(jobModel.JobName, jobModel.Group));
-            }
+        if (trigger)
+        {
+            await Scheduler.TriggerJob(JobKey.Create(jobModel.JobName, jobModel.Group));
         }
 
         return Json(result);
@@ -182,22 +185,22 @@ public class JobsController : PageControllerBase
     [HttpPost, JsonErrorResponse]
     public async Task<IActionResult> Delete([FromBody] KeyModel model)
     {
-        if (!EnsureValidKey(model)) return BadRequest();
+        if (!EnsureValidKey(model)) return BadRequest()!;
 
         var key = model.ToJobKey();
+        
+        if (key is null)throw new InvalidOperationException("Cannot delete job, key is invalid");
+        if (!await Scheduler.DeleteJob(key)) throw new InvalidOperationException("Cannot delete job " + key);
 
-        if (!await Scheduler.DeleteJob(key))
-            throw new InvalidOperationException("Cannot delete job " + key);
-
-        return NoContent();
+        return NoContent()!;
     }
 
     [HttpGet, JsonErrorResponse]
     public async Task<IActionResult> AdditionalData()
     {
         var keys = await Scheduler.GetJobKeys(GroupMatcher<JobKey>.AnyGroup());
-        var history = await Scheduler.Context.GetExecutionHistoryStore().FilterLastOfEveryJob(10);
-        var historyByJob = history.ToLookup(x => x.Job);
+        var history = await Scheduler.Context.GetExecutionHistoryStore().Maybe(s=>s.FilterLastOfEveryJob(10));
+        var historyByJob = history?.ToLookup(x => x.Job);
 
         var list = new List<object>();
         foreach (var key in keys)
@@ -209,7 +212,7 @@ public class JobsController : PageControllerBase
             list.Add(new
             {
                 JobName = key.Name, key.Group,
-                History = historyByJob.TryGet(key.ToString()).ToHistogram(),
+                History = historyByJob?.TryGet(key.ToString()).ToHistogram(),
                 NextFireTime = nextFires.Where(x => x != null).OrderBy(x => x).FirstOrDefault()?.ToDefaultFormat(),
             });
         }
@@ -223,7 +226,7 @@ public class JobsController : PageControllerBase
         return Edit(name, group, clone: true);
     }
 
-    private bool EnsureValidKey(string name, string group) => !(string.IsNullOrEmpty(name) || string.IsNullOrEmpty(group));
+    private bool EnsureValidKey(string? name, string? group) => !(string.IsNullOrEmpty(name!) || string.IsNullOrEmpty(group!));
     private bool EnsureValidKey(KeyModel model) => EnsureValidKey(model.Name, model.Group);
 
 }

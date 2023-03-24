@@ -1,4 +1,6 @@
-﻿using HandlebarsDotNet;
+﻿#nullable enable
+using System;
+using HandlebarsDotNet;
 using Quartz;
 using Quartzmin.Helpers;
 
@@ -20,26 +22,29 @@ public class Services
 
     internal Cache Cache { get; private set; }
 
+    private Services(IHandlebars handlebars, QuartzminOptions options)
+    {
+        Handlebars = handlebars;
+        Scheduler = options.Scheduler ?? throw new Exception($"Invalid options in {nameof(Services)}.{nameof(Create)}. No {nameof(options.Scheduler)} provided.");
+        Options = options;
+        
+        ViewEngine = new ViewEngine(this);
+        TypeHandlers = new TypeHandlerService(this);
+        Cache = new Cache(this);
+    }
+
     public static Services Create(QuartzminOptions options)
     {
-        var handlebarsConfiguration = new HandlebarsConfiguration
+        var handlebars = HandlebarsDotNet.Handlebars.Create(new HandlebarsConfiguration
         {
             FileSystem = ViewFileSystemFactory.Create(options),
             ThrowOnUnresolvedBindingExpression = true,
-        };
+        });
+        if (handlebars is null) throw new Exception($"Failed to construct 'Handlebars' in {nameof(Services)}.{nameof(Create)}");
 
-        var services = new Services
-        {
-            Options = options,
-            Scheduler = options.Scheduler,
-            Handlebars = HandlebarsDotNet.Handlebars.Create(handlebarsConfiguration),
-        };
+        var services = new Services(handlebars, options);
 
         HandlebarsHelpers.Register(services);
-
-        services.ViewEngine = new ViewEngine(services);
-        services.TypeHandlers = new TypeHandlerService(services);
-        services.Cache = new Cache(services);
 
         return services;
     }

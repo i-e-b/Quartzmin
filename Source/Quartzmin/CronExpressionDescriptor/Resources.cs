@@ -1,7 +1,7 @@
 ﻿#nullable enable
 using System.Collections.Generic;
 
-namespace CronExpressionDescriptor;
+namespace Quartzmin.CronExpressionDescriptor;
 
 internal static class Resources
 {

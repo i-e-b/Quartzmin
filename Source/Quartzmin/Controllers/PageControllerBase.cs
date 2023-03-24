@@ -69,7 +69,6 @@ public abstract partial class PageControllerBase
     protected IActionResult View(string viewName, object? model)
     {
         var engine = Services.ViewEngine;
-        if (engine is null) return StatusCode(500)!;
         var content = engine.Render($"{GetRouteData("controller")}/{viewName}.hbs", new Page(this, model));
         return Html(content);
     }
@@ -106,7 +105,7 @@ public abstract partial class PageControllerBase
 
     protected JobDataMapItem JobDataMapItemTemplate => new()
     {
-        SelectedType = Services.Options!.DefaultSelectedType,
-        SupportedTypes = Services.Options.StandardTypes!.Order(),
+        SelectedType = Services.Options.DefaultSelectedType,
+        SupportedTypes = Services.Options.StandardTypes.Order(),
     };
 }

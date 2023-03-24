@@ -1,5 +1,5 @@
 ﻿#nullable enable
-namespace CronExpressionDescriptor;
+namespace Quartzmin.CronExpressionDescriptor;
 
 /// <summary>
 /// Options for parsing and describing a Cron Expression

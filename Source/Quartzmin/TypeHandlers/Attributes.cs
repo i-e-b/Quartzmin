@@ -49,13 +49,11 @@ public class EmbeddedTypeHandlerResourcesAttribute : TypeHandlerResourcesAttribu
     protected string GetManifestResourceString(string name)
     {
         var fullName = $"{Namespace}.{name}";
-        using (var stream = Assembly.GetManifestResourceStream(fullName))
-        {
-            if (stream == null)
-                throw new InvalidOperationException("Embedded resource not found: " + fullName + " in assembly: " + Assembly.FullName);
+        using var stream = Assembly.GetManifestResourceStream(fullName);
+        if (stream == null)
+            throw new InvalidOperationException("Embedded resource not found: " + fullName + " in assembly: " + Assembly.FullName);
 
-            using (var reader = new StreamReader(stream, Encoding.UTF8))
-                return reader.ReadToEnd();
-        }
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        return reader.ReadToEnd();
     }
 }

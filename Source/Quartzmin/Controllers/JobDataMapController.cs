@@ -48,10 +48,11 @@ public class JobDataMapController : PageControllerBase
 
     private class BadRequestResult : IActionResult
     {
-        public string ReasonPhrase { get; set; }
+        public string ReasonPhrase { get; set; } = "Unknown";
         public Task ExecuteResultAsync(ActionContext context)
         {
-            context.HttpContext.Features.Get<IHttpResponseFeature>().ReasonPhrase = ReasonPhrase;
+            var responseFeature = context.HttpContext?.Features?.Get<IHttpResponseFeature>();
+            if (responseFeature is not null) responseFeature.ReasonPhrase = ReasonPhrase;
             return Task.FromResult(0);
         }
     }
@@ -59,7 +60,7 @@ public class JobDataMapController : PageControllerBase
     [HttpGet, ActionName("TypeHandlers.js")]
     public IActionResult TypeHandlersScript()
     {
-        var etag = Services.TypeHandlers.LastModified.ETag();
+        var etag = Services.TypeHandlers!.LastModified.ETag();
 
         if (etag.Equals(GetETag()))
             return NotModified();

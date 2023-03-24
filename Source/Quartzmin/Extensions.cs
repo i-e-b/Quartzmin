@@ -17,6 +17,12 @@ namespace Quartzmin;
 
 internal static class Extensions
 {
+    public static Task<TO?> Maybe<TS, TO>(this TS? store, Func<TS, Task<TO>> func)
+    {
+        if (store is null) return Task.FromResult<TO?>(default);
+        return func(store)!;
+    }
+
     public static TypeHandlerBase[] Order(this IEnumerable<TypeHandlerBase> typeHandlers)
     {
         return typeHandlers.OrderBy(x => x.DisplayName).ToArray();
@@ -24,7 +30,7 @@ internal static class Extensions
 
     public static JobDataMapItemBase[] GetModel(this IEnumerable<Dictionary<string, object>> formData, Services services)
     {
-        return formData.Select(x => JobDataMapItemBase.FromDictionary(x, services)).Where(x => !x.IsLast).ToArray();
+        return formData.Select(x => JobDataMapItemBase.FromDictionary(x, services)).Where(x => x is not null && !x.IsLast).ToArray();
     }
 
     public static string ToDefaultFormat(this DateTime date)
@@ -32,12 +38,12 @@ internal static class Extensions
         return date.ToString(DateTimeSettings.DefaultDateFormat + " " + DateTimeSettings.DefaultTimeFormat, CultureInfo.InvariantCulture);
     }
 
-    public static Dictionary<string, string> ToDictionary(this IEnumerable<TimeZoneInfo> timeZoneInfos)
+    public static Dictionary<string, string?> ToDictionary(this IEnumerable<TimeZoneInfo> timeZoneInfos)
     {
         return timeZoneInfos.ToDictionary(x => x.Id, x =>
         {
             var title = x.ToString();
-            if (!title.StartsWith("("))
+            if (title?.StartsWith("(") == false)
                 title = $"({title}) {x.Id}";
             return title;
         });
@@ -45,10 +51,11 @@ internal static class Extensions
 
     public static IEnumerable<ICalendar> Flatten(this ICalendar root)
     {
-        while (root != null)
+        ICalendar? current = root;
+        while (current != null)
         {
-            yield return root;
-            root = root.CalendarBase;
+            yield return current;
+            current = current.CalendarBase;
         }
     }
 
@@ -60,11 +67,9 @@ internal static class Extensions
 
     public static string ReadAsString(this HttpRequest request)
     {
-        using (var ms = new MemoryStream())
-        {
-            request.Body.CopyTo(ms);
-            return Encoding.UTF8.GetString(ms.ToArray());
-        }
+        using var ms = new MemoryStream();
+        request.Body?.CopyTo(ms);
+        return Encoding.UTF8.GetString(ms.ToArray());
     }
 
     public static JobDataMap GetQuartzJobDataMap(this IEnumerable<JobDataMapItemBase> models)
@@ -72,33 +77,31 @@ internal static class Extensions
         var map = new JobDataMap();
 
         foreach (var item in models)
+        {
+            if (item.Name is null || item.Value is null) continue;
             map.Put(item.Name, item.Value);
+        }
 
         return map;
     }
 
     public static IEnumerable<T> SkipLast<T>(this IEnumerable<T> source)
     {
-        using (var it = source.GetEnumerator())
+        using var it = source.GetEnumerator();
+        if (!it.MoveNext()) yield break;
+        
+        var item = it.Current;
+        while (it.MoveNext())
         {
-            if (it.MoveNext())
-            {
-                var item = it.Current;
-                while (it.MoveNext())
-                {
-                    yield return item;
-                    item = it.Current;
-                }
-            }
+            yield return item;
+            item = it.Current;
         }
     }
 
-    public static object GetValue(this IDictionary<string, object> dict, string key, object @default)
+    public static object? GetValue(this IDictionary<string, object> dict, string? key, object? @default)
     {
-        if (dict.TryGetValue(key, out var value))
-            return value;
-        else
-            return @default;
+        if (key is null) return null;
+        return dict.TryGetValue(key, out var value) ? value : @default;
     }
 
     public static string[] GroupArray(this IEnumerable<string> seq)
@@ -116,6 +119,7 @@ internal static class Extensions
         // https://github.com/JamesNK/Newtonsoft.Json/blob/master/Src/Newtonsoft.Json/Utilities/ReflectionUtils.cs
 
         var fullyQualifiedTypeName = type.AssemblyQualifiedName;
+        if (fullyQualifiedTypeName is null) return type.Name;
 
         var builder = new StringBuilder();
 
@@ -165,11 +169,9 @@ internal static class Extensions
 
     private static List<JobDataMapItem> GetJobDataMapModelCore(object jobOrTrigger, Services services)
     {
-        List<JobDataMapItem> list = new List<JobDataMapItem>();
+        var list = new List<JobDataMapItem>();
 
-        // TODO: doplnit parametre z template na zaklade jobKey; value najprv skonvertovat na ocakavany typ zo sablony
-
-        JobDataMap jobDataMap = null;
+        JobDataMap? jobDataMap = null;
 
         {
             if (jobOrTrigger is IJobDetail j)
@@ -183,9 +185,7 @@ internal static class Extensions
 
         foreach (var pair in jobDataMap)
         {
-            JobDataMapItem model;
-
-            model = new JobDataMapItem
+            var model = new JobDataMapItem
             {
                 Enabled = true,
                 Name = pair.Key,
@@ -204,11 +204,9 @@ internal static class Extensions
                 // find the best TypeHandler
                 foreach (var t in typeHandlers)
                 {
-                    if (t.CanHandle(model.Value))
-                    {
-                        model.SelectedType = t;
-                        break;
-                    }
+                    if (!t.CanHandle(model.Value)) continue;
+                    model.SelectedType = t;
+                    break;
                 }
 
                 if (model.SelectedType == null) // if there is no suitable TypeHandler, create dynamic one
@@ -216,9 +214,9 @@ internal static class Extensions
                     var t = model.Value.GetType();
 
                     string strValue;
-                    var m = t.GetMethod(nameof(ToString), BindingFlags.Instance | BindingFlags.Public, null, CallingConventions.Any, new Type[0], null);
-                    if (m.DeclaringType == typeof(object))
-                        strValue = "{" + t.ToString() + "}";
+                    var m = t.GetMethod(nameof(ToString), BindingFlags.Instance | BindingFlags.Public, null!, CallingConventions.Any, Type.EmptyTypes, null!);
+                    if (m?.DeclaringType == typeof(object))
+                        strValue = "{" + t + "}";
                     else
                         strValue = string.Format(CultureInfo.InvariantCulture, "{0}", model.Value);
 
@@ -279,7 +277,7 @@ internal static class Extensions
         return TriggerType.Unknown;
     }
 
-    public static string GetScheduleDescription(this ITrigger trigger)
+    public static string? GetScheduleDescription(this ITrigger trigger)
     {
         if (trigger is ICronTrigger cr)
             return CronExpressionDescriptor.ExpressionDescriptor.GetDescription(cr.CronExpressionString);
@@ -308,11 +306,12 @@ internal static class Extensions
         public string Plural { get; set; }
         public long Multiplier { get; set; }
 
-        public TimespanPart(string singular, long multiplier) : this(singular)
+        private TimespanPart(string singular, long multiplier) : this(singular)
         {
             Multiplier = multiplier;
         }
-        public TimespanPart(string singular)
+
+        private TimespanPart(string singular)
         {
             Singular = singular;
             Plural = singular + "s";
@@ -351,7 +350,7 @@ internal static class Extensions
         var messagesParts = new List<string>();
         foreach (var part in TimespanPart.Items)
         {
-            var currentPartValue = Math.Floor(diff / part.Multiplier);
+            var currentPartValue = (long)Math.Floor(diff / part.Multiplier);
             diff -= currentPartValue * part.Multiplier;
 
             if (currentPartValue == 1)
@@ -372,7 +371,7 @@ internal static class Extensions
             result += repeatCount + " times ";
         result += "every ";
 
-        var unitStr = repeatIntervalUnit.ToString().ToLower();
+        var unitStr = repeatIntervalUnit.ToString()?.ToLower();
 
         if (repeatInterval == 1)
             result += unitStr;
@@ -404,18 +403,19 @@ internal static class Extensions
         return new TimeOfDay(timeSpan.Hours, timeSpan.Minutes, timeSpan.Seconds);
     }
 
-    public static IEnumerable<TElement> TryGet<TKey, TElement>(this ILookup<TKey, TElement> lookup, TKey key)
+    public static IEnumerable<TElement>? TryGet<TKey, TElement>(this ILookup<TKey, TElement> lookup, TKey key)
     {
         return lookup.Contains(key) ? lookup[key] : null;
     }
 
-    public static Histogram ToHistogram(this IEnumerable<ExecutionHistoryEntry> entries, bool detailed = false)
+    public static Histogram? ToHistogram(this IEnumerable<ExecutionHistoryEntry>? entries, bool detailed = false)
     {
-        if (entries == null || entries.Any() == false)
-            return null;
+        if (entries is null) return null;
+        var allEntries = entries.ToList();
+        if (allEntries.Count < 1) return null;
 
         var hst = new Histogram();
-        foreach (var entry in entries)
+        foreach (var entry in allEntries)
         {
             TimeSpan? duration = null;
             var cssClass = "";

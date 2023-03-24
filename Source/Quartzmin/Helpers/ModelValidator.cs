@@ -1,15 +1,17 @@
-﻿using Quartzmin.Models;
+﻿#nullable enable
+using Quartzmin.Models;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
+
 using System.Reflection;
 
 namespace Quartzmin.Helpers;
 
 public static class ModelValidator
 {
-    public static void ValidateObject<T>(IEnumerable<T> collection, ICollection<ValidationError> errors, string ownerField = null)
+    public static void ValidateObject<T>(IEnumerable<T> collection, ICollection<ValidationError> errors, string? ownerField = null)
     {
         foreach (var item in collection)
         {
@@ -26,13 +28,19 @@ public static class ModelValidator
         }
     }
 
-    public static void ValidateObject(object obj, ICollection<ValidationError> errors, params string[] ownerField)
+    public static void ValidateObject(object? obj, ICollection<ValidationError> errors, params string?[] ownerField)
     {
         ValidateObject(obj, errors, true, ownerField);
     }
 
-    public static void ValidateObject(object obj, ICollection<ValidationError> errors, bool camelCase, params string[] ownerField)
+    public static void ValidateObject(object? obj, ICollection<ValidationError> errors, bool camelCase, params string?[] ownerField)
     {
+        if (obj is null)
+        {
+            errors.Add(ValidationError.EmptyField("Model"));
+            return;
+        }
+
         var members = obj.GetType().GetMembers(BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
 
         foreach (var p in members.OfType<PropertyInfo>())
@@ -42,9 +50,13 @@ public static class ModelValidator
 
             var required = p.GetCustomAttribute<RequiredAttribute>();
 
-            if (required?.IsValid(p.GetValue(obj)) == false)
+            if (required is not null)
             {
-                errors.Add(ValidationError.EmptyField(GetFieldName(p.Name, camelCase, ownerField)));
+                var val = p.GetValue(obj);
+                if (val is null || required.IsValid(val) == false)
+                {
+                    errors.Add(ValidationError.EmptyField(GetFieldName(p.Name, camelCase, ownerField)));
+                }
             }
 
             if (p.GetValue(obj) is IHasValidation nestedValidation)
@@ -54,36 +66,31 @@ public static class ModelValidator
         }
     }
 
-    public static string GetFieldName(string field, bool camelCase, params string[] ownerField)
+    public static string GetFieldName(string field, bool camelCase, params string?[] ownerField)
     {
         if (camelCase)
         {
-            field = FirstCharToLower(field);
+            field = FirstCharToLower(field) ?? field;
             ownerField = FirstCharToLower(ownerField);
         }
 
-        if (ownerField == null || ownerField.Length == 0)
-            return field;
+        if (ownerField.Length < 1) return field;
 
         var path = string.Join(".", ownerField.Skip(1));
 
-        if (!string.IsNullOrEmpty(path))
-            path += ".";
+        if (!string.IsNullOrEmpty(path)) path += ".";
 
         return $"{ownerField[0]}[{path}{field}]";
     }
 
-    private static string[] FirstCharToLower(params string[] inputs)
+    private static string?[] FirstCharToLower(params string?[] inputs)
     {
-        if (inputs == null)
-            return null;
-        return inputs.Select(x => FirstCharToLower(x)).ToArray();
+        return inputs.Select(FirstCharToLower).ToArray();
     }
 
-    private static string FirstCharToLower(string input)
+    private static string? FirstCharToLower(string? input)
     {
-        if (String.IsNullOrEmpty(input))
-            return input;
+        if (input is null || string.IsNullOrEmpty(input)) return input;
 
         return input[0].ToString().ToLower() + input.Substring(1);
     }

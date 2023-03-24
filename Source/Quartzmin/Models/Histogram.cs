@@ -1,7 +1,7 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Web;
 
 namespace Quartzmin.Models;
 
@@ -21,9 +21,9 @@ public class Histogram
 
         public double Percentage { get; set; }
 
-        public string Tooltip { get; set; }
+        public string Tooltip { get; set; }="";
 
-        public string CssClass { get; set; }
+        public string CssClass { get; set; }="";
     }
 
     public void AddBar(double value, string tooltip, string cssClass)
@@ -61,5 +61,5 @@ public class Histogram
 
     private static readonly Lazy<Histogram> _empty = new(CreateEmpty);
 
-    public static Histogram Empty => _empty.Value;
+    public static Histogram Empty => _empty.Value!;
 }

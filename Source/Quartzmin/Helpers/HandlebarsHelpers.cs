@@ -1,4 +1,5 @@
-﻿using HandlebarsDotNet;
+﻿#nullable enable
+using HandlebarsDotNet;
 using Quartzmin.Models;
 using Quartzmin.TypeHandlers;
 using System;
@@ -9,14 +10,13 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Web;
-
 using static Quartzmin.Controllers.PageControllerBase;
 
 namespace Quartzmin.Helpers;
 
 internal class HandlebarsHelpers
 {
-    private Services _services;
+    private readonly Services _services;
 
     public HandlebarsHelpers(Services services)
     {
@@ -32,20 +32,26 @@ internal class HandlebarsHelpers
     {
         var h = _services.Handlebars;
 
-        h.RegisterHelper("Upper", (o, c, a) => o.Write(a[0].ToString().ToUpper()));
-        h.RegisterHelper("Lower", (o, c, a) => o.Write(a[0].ToString().ToLower()));
-        h.RegisterHelper("LocalTimeZoneInfoId", (o, c, a) => o.Write(TimeZoneInfo.Local.Id));
-        h.RegisterHelper("SystemTimeZonesJson", (o, c, a) => Json(o, c, TimeZoneInfo.GetSystemTimeZones().ToDictionary()));
-        h.RegisterHelper("DefaultDateFormat", (o, c, a) => o.Write(DateTimeSettings.DefaultDateFormat));
-        h.RegisterHelper("DefaultTimeFormat", (o, c, a) => o.Write(DateTimeSettings.DefaultTimeFormat));
-        h.RegisterHelper("DoLayout", (o, c, a) => c.Layout());
-        h.RegisterHelper("SerializeTypeHandler", (o, c, a) => o.WriteSafeString(((Services)a[0]).TypeHandlers.Serialize((TypeHandlerBase)c)));
-        h.RegisterHelper("Disabled", (o, c, a) => { if (IsTrue(a[0])) o.Write("disabled"); });
-        h.RegisterHelper("Checked", (o, c, a) => { if (IsTrue(a[0])) o.Write("checked"); });
-        h.RegisterHelper("nvl", (o, c, a) => o.Write(a[a[0] == null ? 1 : 0]));
-        h.RegisterHelper("not", (o, c, a) => o.Write(IsTrue(a[0]) ? "False" : "True"));
+        h.RegisterHelper("Upper", (o, _, a) => o.Write(a[0]?.ToString()?.ToUpper() ?? ""));
+        h.RegisterHelper("Lower", (o, _, a) => o.Write(a[0]?.ToString()?.ToLower() ?? ""));
+        h.RegisterHelper("LocalTimeZoneInfoId", (o, _, _) => o.Write(TimeZoneInfo.Local.Id));
+        h.RegisterHelper("SystemTimeZonesJson", (o, c, _) => Json(o, c, TimeZoneInfo.GetSystemTimeZones().ToDictionary()));
+        h.RegisterHelper("DefaultDateFormat", (o, _, _) => o.Write(DateTimeSettings.DefaultDateFormat));
+        h.RegisterHelper("DefaultTimeFormat", (o, _, _) => o.Write(DateTimeSettings.DefaultTimeFormat));
+        h.RegisterHelper("DoLayout", (_, c, _) => c.Layout());
+        h.RegisterHelper("SerializeTypeHandler", (o, c, a) => o.WriteSafeString((a[0] as Services)?.TypeHandlers.Serialize((TypeHandlerBase)c) ?? ""));
+        h.RegisterHelper("Disabled", (o, _, a) =>
+        {
+            if (IsTrue(a[0])) o.Write("disabled");
+        });
+        h.RegisterHelper("Checked", (o, _, a) =>
+        {
+            if (IsTrue(a[0])) o.Write("checked");
+        });
+        h.RegisterHelper("nvl", (o, _, a) => o.Write(a[a[0] is null ? 1 : 0] ?? ""));
+        h.RegisterHelper("not", (o, _, a) => o.Write(IsTrue(a[0]) ? "False" : "True"));
 
-        h.RegisterHelper(nameof(BaseUrl), (o, c, a) => o.WriteSafeString(BaseUrl));
+        h.RegisterHelper(nameof(BaseUrl), (o, _, _) => o.WriteSafeString(BaseUrl));
         h.RegisterHelper(nameof(MenuItemActionLink), MenuItemActionLink);
         h.RegisterHelper(nameof(RenderJobDataMapValue), RenderJobDataMapValue);
         h.RegisterHelper(nameof(ViewBag), ViewBag);
@@ -62,11 +68,15 @@ internal class HandlebarsHelpers
         h.RegisterHelper(nameof(ProductName), ProductName);
     }
 
-    private static bool IsTrue(object value) => value?.ToString()?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
+    private static bool IsTrue(object? value) => value?.ToString()?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
 
-    private string HtmlEncode(object value) => _services.ViewEngine.Encode(value);
+    private string HtmlEncode(object? value)
+    {
+        if (value is null) return "";
+        return _services.ViewEngine.Encode(value);
+    }
 
-    private string UrlEncode(string value) => HttpUtility.UrlEncode(value);
+    private string UrlEncode(string? value) => HttpUtility.UrlEncode(value ?? "");
 
     private string BaseUrl
     {
@@ -79,10 +89,9 @@ internal class HandlebarsHelpers
         }
     }
 
-    private string AddQueryString(string uri, IEnumerable<KeyValuePair<string, object>> queryString)
+    private string AddQueryString(string uri, IEnumerable<KeyValuePair<string, object>>? queryString)
     {
-        if (queryString == null)
-            return uri;
+        if (queryString is null) return uri;
 
         var anchorIndex = uri.IndexOf('#');
         var uriToBeAppended = uri;
@@ -105,7 +114,11 @@ internal class HandlebarsHelpers
             sb.Append(hasQuery ? '&' : '?');
             sb.Append(UrlEncode(parameter.Key));
             sb.Append('=');
-            sb.Append(UrlEncode(string.Format(CultureInfo.InvariantCulture, "{0}", parameter.Value)));
+            if (parameter.Value is not null)
+            {
+                sb.Append(UrlEncode(string.Format(CultureInfo.InvariantCulture, "{0}", parameter.Value)));
+            }
+
             hasQuery = true;
         }
 
@@ -129,7 +142,7 @@ internal class HandlebarsHelpers
         var dict = arguments[0] as IDictionary<string, object> ?? new Dictionary<string, object> { ["controller"] = arguments[0] };
 
         var classes = "item";
-        if (dict["controller"].Equals(context.ControllerName))
+        if (dict["controller"]?.Equals(context.ControllerName) == true)
             classes += " active";
 
         var url = BaseUrl + dict["controller"];
@@ -143,8 +156,8 @@ internal class HandlebarsHelpers
         if (arguments.Length < 1 || arguments.Length > 3)
             throw new ArgumentOutOfRangeException(nameof(arguments));
 
-        IDictionary<string, object> routeValues = null;
-        string controller = null;
+        IDictionary<string, object>? routeValues = null;
+        string? controller = null;
         var action = (arguments[0] as Page)?.ActionName ?? (string)arguments[0];
 
         if (arguments.Length >= 2) // [actionName, controllerName/routeValues ]
@@ -158,6 +171,7 @@ internal class HandlebarsHelpers
             else
                 throw new Exception("ActionUrl: Invalid parameter 1");
         }
+
         if (arguments.Length == 3) // [actionName, controllerName, routeValues]
             routeValues = (IDictionary<string, object>)arguments[2];
 
@@ -172,16 +186,25 @@ internal class HandlebarsHelpers
         output.WriteSafeString(AddQueryString(url, routeValues));
     }
 
-    private void Selected(TextWriter output, dynamic context, params object[] arguments)
+    private void Selected(TextWriter output, dynamic context, params object?[] arguments)
     {
-        string selected;
+        string? selected;
         if (arguments.Length >= 2)
             selected = arguments[1]?.ToString();
         else
             selected = context["selected"].ToString();
 
-        if (((string)arguments[0]).Equals(selected, StringComparison.InvariantCultureIgnoreCase))
+        if (selected is null)
+        {
+            if (arguments[0] is null)
+            {
+                output.Write("selected");
+            }
+        }
+        else if ((arguments[0] as string)?.Equals(selected, StringComparison.InvariantCultureIgnoreCase) == true)
+        {
             output.Write("selected");
+        }
     }
 
     private void Json(TextWriter output, dynamic context, params object[] arguments)
@@ -192,14 +215,15 @@ internal class HandlebarsHelpers
     private void RenderJobDataMapValue(TextWriter output, dynamic context, params object[] arguments)
     {
         var item = (JobDataMapItem)arguments[1];
-        output.WriteSafeString(item.SelectedType.RenderView((Services)arguments[0], item.Value));
+        output.WriteSafeString(item.SelectedType?.RenderView((Services)arguments[0], item.Value!) ?? "");
     }
 
-    private void isType(TextWriter writer, HelperOptions options, dynamic context, params object[] arguments)
+    private void isType(TextWriter writer, HelperOptions options, dynamic context, params object?[] arguments)
     {
         Type[] expectedType;
 
-        var strType = (string)arguments[1];
+        if (arguments.Length < 2) throw new ArgumentException("Invalid type");
+        var strType = arguments[1] as string;
 
         switch (strType)
         {
@@ -215,20 +239,21 @@ internal class HandlebarsHelpers
 
         var t = arguments[0]?.GetType();
 
-        if (expectedType.Any(x => x.IsAssignableFrom(t)))
-            options.Template(writer, (object)context);
+        if (t is not null && expectedType.Any(x => x.IsAssignableFrom(t)))
+            options.Template?.Invoke(writer, (object)context);
         else
-            options.Inverse(writer, (object)context);
+            options.Inverse?.Invoke(writer, (object)context);
     }
 
     private void eachPair(TextWriter writer, HelperOptions options, dynamic context, params object[] arguments)
     {
         void OutputElements<T>()
         {
-            if (arguments[0] is IEnumerable<T> pairs)
+            if (arguments[0] is not IEnumerable<T> pairs) return;
+            foreach (var item in pairs)
             {
-                foreach (var item in pairs)
-                    options.Template(writer, item);
+                if (item is null) continue;
+                options.Template?.Invoke(writer, item);
             }
         }
 
@@ -241,11 +266,9 @@ internal class HandlebarsHelpers
         eachPair(writer, options, context, ((dynamic)arguments[0]).GetItems());
     }
 
-    private void ToBase64(TextWriter output, dynamic context, params object[] arguments)
+    private void ToBase64(TextWriter output, dynamic context, params object?[] arguments)
     {
-        var bytes = (byte[])arguments[0];
-
-        if (bytes != null)
+        if (arguments.Length > 0 && arguments[0] is byte[] bytes)
             output.Write(Convert.ToBase64String(bytes));
     }
 
@@ -253,16 +276,16 @@ internal class HandlebarsHelpers
     {
         IDictionary<string, object> viewBag = context.ViewBag;
 
-        if (viewBag.TryGetValue("ShowFooter", out var show) && (bool)show == true)
+        if (viewBag.TryGetValue("ShowFooter", out var show) && (bool)show)
         {
-            options.Template(writer, (object)context);
+            options.Template?.Invoke(writer, (object)context);
         }
     }
 
     private void QuartzminVersion(TextWriter output, dynamic context, params object[] arguments)
     {
         var v = GetType().Assembly.GetCustomAttributes<AssemblyInformationalVersionAttribute>().FirstOrDefault();
-        output.Write(v.InformationalVersion);
+        if (v?.InformationalVersion is not null) output.Write(v.InformationalVersion);
     }
 
     private void Logo(TextWriter output, dynamic context, params object[] arguments)

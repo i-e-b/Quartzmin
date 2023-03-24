@@ -1,18 +1,18 @@
-﻿
+﻿#nullable enable
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using System;
 using System.Reflection;
+using System.Threading.Tasks;
 
 namespace Quartzmin;
 
 public static class ApplicationBuilderExtensions
 {
-    public static void UseQuartzmin(this IApplicationBuilder app, QuartzminOptions options, Action<Services> configure = null)
+    public static void UseQuartzmin(this IApplicationBuilder app, QuartzminOptions options, Action<Services>? configure = null)
     {
         options = options ?? throw new ArgumentNullException(nameof(options));
 
@@ -23,18 +23,20 @@ public static class ApplicationBuilderExtensions
 
         app.Use(async (context, next) =>
         {
+            if (context?.Items is null) throw new Exception("Cannot build application: context is null");
             context.Items[typeof(Services)] = services;
-            await next.Invoke();
+            await (next?.Invoke() ?? Task.CompletedTask);
         });
             
         app.UseExceptionHandler(errorApp =>
         {
             errorApp.Run(async context =>
             {
-                var ex = context.Features.Get<IExceptionHandlerFeature>().Error;
+                if (context?.Response is null) return;
+                var ex = context.Features?.Get<IExceptionHandlerFeature>()?.Error ?? new Exception("Unable to determine fault");
                 context.Response.StatusCode = 500;
                 context.Response.ContentType = "text/html";
-                await context.Response.WriteAsync(services.ViewEngine.ErrorPage(ex));
+                await context.Response.WriteAsync(services.ViewEngine.ErrorPage(ex))!;
             });
         });
 
@@ -49,10 +51,10 @@ public static class ApplicationBuilderExtensions
     private static void UseFileServer(this IApplicationBuilder app, QuartzminOptions options)
     {
         IFileProvider fs;
-        if (string.IsNullOrEmpty(options.ContentRootDirectory))
+        if (string.IsNullOrEmpty(options.ContentRootDirectory!))
             fs = new ManifestEmbeddedFileProvider(Assembly.GetExecutingAssembly(), "Content");
         else
-            fs = new PhysicalFileProvider(options.ContentRootDirectory);
+            fs = new PhysicalFileProvider(options.ContentRootDirectory!);
 
         var fsOptions = new FileServerOptions
         {
@@ -68,8 +70,8 @@ public static class ApplicationBuilderExtensions
     public static void AddQuartzmin(this IServiceCollection services)
     {
         services.AddMvcCore()
-            .AddApplicationPart(Assembly.GetExecutingAssembly())
-            .AddJsonFormatters();
+            ?.AddApplicationPart(Assembly.GetExecutingAssembly())
+            ?.AddJsonFormatters();
     }
 
 }
