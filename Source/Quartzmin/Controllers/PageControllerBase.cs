@@ -7,23 +7,21 @@ using Microsoft.AspNetCore.Http;
 using Quartzmin.Models;
 using Quartz;
 using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
+using Quartzmin.Helpers;
 
 namespace Quartzmin.Controllers;
 
-public abstract partial class PageControllerBase : ControllerBase
+public abstract class PageControllerBase : ControllerBase
 {
-    private static readonly JsonSerializerSettings _serializerSettings = new()
-    {
-        ContractResolver = new DefaultContractResolver(), // PascalCase as default
-    };
-
     private HttpRequest GetRequest() => Request ?? throw new Exception($"Invalid controller instance: no '{nameof(Request)}' instance");
 
     protected Services Services => (Services)(GetRequest().HttpContext?.Items?[typeof(Services)] ?? throw new Exception("Invalid controller instance: no 'Services' instance in 'HttpContext.Items'"));
     protected string GetRouteData(string key) => RouteData?.Values?[key]?.ToString() ?? throw new Exception($"Invalid RouteData in {nameof(PageControllerBase)}");
-    protected static IActionResult Json(object content) => new JsonResult(content, _serializerSettings);
+    
+    protected static IActionResult Json(object content)
+    {
+        return new JsonXResult(content);
+    }
 
     protected static IActionResult NotModified() => new StatusCodeResult(304);
 
@@ -32,10 +30,7 @@ public abstract partial class PageControllerBase : ControllerBase
         var values = Request?.Headers?[key];
         return string.IsNullOrEmpty(values!) ? (IEnumerable<string>?)null : values;
     }
-}
-
-public abstract partial class PageControllerBase
-{
+    
     protected IScheduler Scheduler => Services.Scheduler ?? throw new Exception($"Internal error: No scheduler in {nameof(PageControllerBase)}");
 
     protected dynamic ViewBag { get; } = new ExpandoObject();

@@ -230,14 +230,15 @@ public class TriggersController : PageControllerBase
         return NoContent()!;
     }
 
-    [HttpPost, JsonErrorResponse]
-    public IActionResult Cron()
+    [HttpGet, HttpPost/*, JsonErrorResponse*/]
+    [Consumes("text/plain", "text/html", "application/json")]
+    public async Task<IActionResult> Cron(string? expression)
     {
-        var cron = (Request?.ReadAsString())?.Trim();
-        if (cron is null || string.IsNullOrEmpty(cron)) return Json(new { Description = "", Next = Array.Empty<object>() });
+        var cron = expression ?? (await Request?.ReadAsString()!).Trim();
+        if (string.IsNullOrEmpty(cron)) return Json(new { Description = "", Next = Array.Empty<object>() });
 
         var desc = "Invalid format.";
-
+        
         try
         {
             desc = CronExpressionDescriptor.ExpressionDescriptor.GetDescription(cron);

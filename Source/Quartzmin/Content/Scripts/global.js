@@ -146,7 +146,9 @@ function initCronLiveDescription(url, $cronInput, $cronDesc, $nextCronDates) {
                     $nextCronDates.popup({ html: '<div class="header">Scheduled dates</div><div class="content">' + nextHtml + '</div>' });
                 }
             },
-            error: function (e) { $cronDesc.text('Error occured.'); }
+            error: function (e) { 
+                $cronDesc.text('Error occured reading cron ('+e.status+')');
+            }
         });
     }
     var cronDescTimer;

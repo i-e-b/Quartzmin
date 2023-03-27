@@ -12,7 +12,7 @@ namespace Quartzmin;
 
 public static class ApplicationBuilderExtensions
 {
-    public static void UseQuartzmin(this IApplicationBuilder app, QuartzminOptions options, Action<Services>? configure = null)
+    public static void UseQuartzmin(this IApplicationBuilder app, QuartzminOptions options, Action<Services>? configure = null, bool addRoutes = true)
     {
         options = options ?? throw new ArgumentNullException(nameof(options));
 
@@ -39,13 +39,16 @@ public static class ApplicationBuilderExtensions
                 await context.Response.WriteAsync(services.ViewEngine.ErrorPage(ex))!;
             });
         });
-
-        app.UseMvc(routes =>
+        
+        if (addRoutes)
         {
-            routes.MapRoute(
-                name: nameof(Quartzmin),
-                template: "{controller=Scheduler}/{action=Index}");
-        });
+            app.UseMvc(routes =>
+            {
+                routes.MapRoute(
+                    name: nameof(Quartzmin),
+                    template: "{controller=Scheduler}/{action=Index}");
+            });
+        }
     }
 
     private static void UseFileServer(this IApplicationBuilder app, QuartzminOptions options)
@@ -70,8 +73,10 @@ public static class ApplicationBuilderExtensions
     public static void AddQuartzmin(this IServiceCollection services)
     {
         services.AddMvcCore()
-            ?.AddApplicationPart(Assembly.GetExecutingAssembly())
-            ?.AddJsonFormatters();
+            ?.AddApplicationPart(Assembly.GetExecutingAssembly());
+            //?.AddJsonFormatters(); // (?) This is causing "Could not load type 'Microsoft.Extensions.DependencyInjection.MvcJsonMvcCoreBuilderExtensions' from assembly 'Microsoft.AspNetCore.Mvc.Formatters.Json"
+            // See: https://github.com/aspnet/Announcements/issues/325
+            //      https://github.com/dotnet/aspnetcore/issues/3612
     }
 
 }

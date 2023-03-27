@@ -89,10 +89,10 @@ internal static class Extensions
         return '\"' + Convert.ToString(etagHash, 16) + '\"';
     }
 
-    public static string ReadAsString(this HttpRequest request)
+    public static async Task<string> ReadAsString(this HttpRequest request)
     {
         using var ms = new MemoryStream();
-        request.Body?.CopyTo(ms);
+        await request.Body?.CopyToAsync(ms)!;
         return Encoding.UTF8.GetString(ms.ToArray());
     }
 
