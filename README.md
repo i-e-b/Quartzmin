@@ -1,8 +1,3 @@
-<p align="center">
-    <img src="https://raw.githubusercontent.com/jlucansky/public-assets/master/Quartzmin/logo.png" height="150">
-</p>
-
----
 
 [![NuGet](https://img.shields.io/nuget/v/Quartzmin.svg)](https://www.nuget.org/packages/Quartzmin)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
